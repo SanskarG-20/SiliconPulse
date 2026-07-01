@@ -1,9 +1,13 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { SignedIn, SignedOut, SignIn, SignUp, useAuth, UserButton } from '@clerk/clerk-react';
 import {
   Search, Zap, Activity, Cpu, ShieldAlert,
   TrendingUp, Layers, FileText, CheckCircle2,
   AlertCircle, RefreshCw, Terminal, Clock,
   ExternalLink, BarChart3, HelpCircle, X,
+  ArrowRight,
+  Home,
   Menu
 } from 'lucide-react';
 import { LiveTicker } from './components/LiveTicker';
@@ -11,19 +15,26 @@ import { CompanyRadar } from './components/CompanyRadar';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { StrategicInsightReport } from './components/StrategicInsightReport';
 import { BackgroundLayer } from './components/BackgroundLayer';
-import { querySiliconPulse, injectSignal, fetchSignals, QueryResponse, formatEvidenceToContext, generateInsight, bootstrapSystem, fetchRecommendations, exportAnalysis, verifySources } from './api/siliconpulseApi';
+import { SourceBadge } from './components/SourceBadge';
+import { querySiliconPulse, injectSignal, fetchSignals, QueryResponse, formatEvidenceToContext, generateInsight, bootstrapSystem, fetchRecommendations, exportAnalysis, verifySources, setAuthTokenGetter, syncAuthenticatedUser } from './api/siliconpulseApi';
 import { INITIAL_LIVE_FEED } from './constants';
 import { LiveEvent } from './types';
+import { buildLiveFeed, createLiveEvent, getRelativeTimeLabel, rotateFeed } from './utils/feedUtils';
+import { resolveTrustLevel } from './utils/sourceMapping';
+import { generateRecommendationsFromFeed } from './utils/recommendationUtils';
 
-const App: React.FC = () => {
+const Dashboard: React.FC = () => {
+  const { getToken } = useAuth();
   const [liveFeed, setLiveFeed] = useState<LiveEvent[]>(INITIAL_LIVE_FEED);
   const [query, setQuery] = useState('');
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString());
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
 
   // Injection Modal State
   const [showInjectModal, setShowInjectModal] = useState(false);
@@ -43,11 +54,31 @@ const App: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const feedRotationRef = useRef(0);
+  const recommendationKeysRef = useRef<Set<string>>(new Set());
+  const remoteRecommendationsRef = useRef<any[]>([]);
+
+  const notify = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 3500);
+  };
 
   useEffect(() => {
-    console.log('✅ SiliconPulse App Loaded - Bootstrapping...');
+    setAuthTokenGetter(() => getToken());
 
+    return () => {
+      setAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  useEffect(() => {
     const init = async () => {
+      try {
+        await syncAuthenticatedUser();
+      } catch (err) {
+        console.error('Authenticated user sync failed:', err);
+      }
+
       // 1. Bootstrap System (Generate Fresh News)
       await bootstrapSystem();
 
@@ -57,8 +88,16 @@ const App: React.FC = () => {
       // 3. Fetch Recommendations
       fetchRecommendations().then(recs => {
         if (recs && recs.length > 0) {
-          setRecommendations(recs);
+          remoteRecommendationsRef.current = recs;
         }
+        const fallbackFeed = liveFeed.length > 0 ? liveFeed : INITIAL_LIVE_FEED;
+        const result = generateRecommendationsFromFeed(
+          fallbackFeed,
+          recommendationKeysRef.current,
+          remoteRecommendationsRef.current
+        );
+        recommendationKeysRef.current = result.nextKeys;
+        setRecommendations(result.recommendations);
       });
     };
 
@@ -79,25 +118,38 @@ const App: React.FC = () => {
     try {
       const signals = await fetchSignals();
       if (signals && signals.length > 0) {
-        // Map API signals to LiveEvent format
-        const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => ({
-          id: `api-${Date.now()}-${idx}`,
-          timestamp: s.timestamp || new Date().toISOString(),
-          source: s.source || 'Unknown',
-          title: s.title,
-          content: s.title, // Compact view uses title as content for now if content missing
-          impactScore: 50, // Default score
-          company: s.company || 'Unknown'
-        }));
-        setLiveFeed(prev => {
-          // Merge new signals with existing ones, avoiding duplicates if possible
-          // For simplicity, just prepending new ones or replacing could work.
-          // Let's just use the API signals + initial feed for now
-          return [...mappedSignals, ...INITIAL_LIVE_FEED].slice(0, 50);
-        });
+        const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => createLiveEvent(s, idx));
+        const ordered = buildLiveFeed(mappedSignals, 10);
+
+        if (ordered.length === 0) {
+          setLiveFeed(INITIAL_LIVE_FEED);
+          return;
+        }
+
+        feedRotationRef.current = (feedRotationRef.current + 1) % ordered.length;
+        const rotated = rotateFeed(ordered, feedRotationRef.current);
+        setLiveFeed(rotated);
+        const recommendationsResult = generateRecommendationsFromFeed(
+          ordered,
+          recommendationKeysRef.current,
+          remoteRecommendationsRef.current
+        );
+        recommendationKeysRef.current = recommendationsResult.nextKeys;
+        setRecommendations(recommendationsResult.recommendations);
+        return;
       }
+
+      setLiveFeed(INITIAL_LIVE_FEED);
+      const fallbackResult = generateRecommendationsFromFeed(
+        INITIAL_LIVE_FEED,
+        recommendationKeysRef.current,
+        remoteRecommendationsRef.current
+      );
+      recommendationKeysRef.current = fallbackResult.nextKeys;
+      setRecommendations(fallbackResult.recommendations);
     } catch (err) {
       console.error("Failed to refresh signals:", err);
+      notify("Live feed refresh failed. Showing cached signals.");
     }
   };
 
@@ -110,17 +162,18 @@ const App: React.FC = () => {
     setError(null);
     setQueryResult(null);
     setInsight(null);
+    setLastSubmittedQuery(finalQuery.trim());
 
     try {
       // 1. Get Evidence FIRST - show immediately
-      const result = await querySiliconPulse(finalQuery);
+      const result = await querySiliconPulse(finalQuery.trim());
       setQueryResult(result);
       setLoading(false); // Stop loading spinner immediately after evidence is shown
 
       // 2. Generate Insight ASYNCHRONOUSLY in background
       // NEW RULE: Always request insight, backend handles zero-evidence fallbacks
-      const context = formatEvidenceToContext(result.evidence);
-      generateInsight(finalQuery, context)
+      const context = formatEvidenceToContext(result.evidence ?? []);
+      generateInsight(finalQuery.trim(), context)
         .then(generatedInsight => {
           setInsight(generatedInsight);
         })
@@ -151,6 +204,7 @@ const App: React.FC = () => {
 
       // Refresh signals and close modal after short delay
       await refreshSignals();
+      notify("Signal injected and feed refreshed.");
       setTimeout(() => {
         setInjectSuccess(false);
         setShowInjectModal(false);
@@ -159,7 +213,7 @@ const App: React.FC = () => {
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Injection failed:", err);
-      // Could set an error state for the modal here
+      notify("Signal injection failed. Please retry.");
     } finally {
       setInjectLoading(false);
     }
@@ -171,14 +225,15 @@ const App: React.FC = () => {
       await exportAnalysis(
         queryResult.query,
         insight,
-        queryResult.evidence,
+        evidenceItems,
         exportFormat,
         includeEvidence
       );
       setShowExportModal(false);
+      notify("Analysis exported.");
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Export failed. See console for details.");
+      notify("Export failed. Please retry.");
     }
   };
 
@@ -188,17 +243,52 @@ const App: React.FC = () => {
     setShowVerifyModal(true);
     try {
       const data = await verifySources(queryResult.query);
-      setVerifiedSources(data.sources);
+      setVerifiedSources(Array.isArray(data?.sources) ? data.sources : []);
     } catch (err) {
       console.error("Verification failed:", err);
+      setVerifiedSources([]);
+      notify("Source verification failed. Please retry.");
     } finally {
       setVerifying(false);
     }
   };
 
+  const resetDashboard = () => {
+    setQuery('');
+    setQueryResult(null);
+    setInsight(null);
+    setError(null);
+    setLoading(false);
+    setLastSubmittedQuery('');
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const retryInsight = () => {
+    if (!queryResult) return;
+    setInsight(null);
+    const context = formatEvidenceToContext(queryResult.evidence ?? []);
+    generateInsight(queryResult.query, context)
+      .then(generatedInsight => {
+        setInsight(generatedInsight);
+      })
+      .catch(() => {
+        setInsight("Insight generation unavailable. Please try again later.");
+      });
+  };
+
+  const evidenceItems = Array.isArray(queryResult?.evidence) ? queryResult.evidence : [];
+  const isInsightUnavailable = typeof insight === 'string' && insight.toLowerCase().includes('unavailable');
+
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
       <BackgroundLayer />
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-lg border border-sky-500/30 bg-slate-950/95 text-sky-100 text-xs font-bold uppercase tracking-widest shadow-2xl">
+          {toast}
+        </div>
+      )}
       {/* INJECTION MODAL */}
       {showInjectModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -363,30 +453,33 @@ const App: React.FC = () => {
                       <p className="text-slate-500 text-sm italic">No sources found for this query.</p>
                     </div>
                   ) : (
-                    verifiedSources.map((src, idx) => (
-                      <div key={idx} className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 flex items-start justify-between">
-                        <div className="flex-1 pr-4">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${src.trust_level === 'High' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                              src.trust_level === 'Medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                'bg-red-500/10 text-red-500 border-red-500/20'
-                              }`}>
-                              {src.trust_level} Trust
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-500">{src.source}</span>
-                            <span className="text-[10px] text-slate-600">•</span>
-                            <span className="text-[10px] text-slate-600">{src.timestamp ? new Date(src.timestamp).toLocaleString() : 'N/A'}</span>
+                    verifiedSources.map((src, idx) => {
+                      const trustLevel = resolveTrustLevel(src.source, src.trust_level);
+                      return (
+                        <div key={idx} className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 flex items-start justify-between">
+                          <div className="flex-1 pr-4">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${trustLevel === 'High' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                trustLevel === 'Medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                  'bg-red-500/10 text-red-500 border-red-500/20'
+                                }`}>
+                                {trustLevel} Trust
+                              </span>
+                              <SourceBadge source={src.source} size="sm" />
+                              <span className="text-[10px] text-slate-600">•</span>
+                              <span className="text-[10px] text-slate-600">{src.timestamp ? new Date(src.timestamp).toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-200 mb-1">{src.title}</h4>
+                            <p className="text-xs text-slate-500 italic">{src.reason}</p>
                           </div>
-                          <h4 className="text-sm font-bold text-slate-200 mb-1">{src.title}</h4>
-                          <p className="text-xs text-slate-500 italic">{src.reason}</p>
+                          {src.url && (
+                            <a href={src.url} target="_blank" rel="noreferrer" className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+                              <ExternalLink size={16} />
+                            </a>
+                          )}
                         </div>
-                        {src.url && (
-                          <a href={src.url} target="_blank" rel="noreferrer" className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
-                            <ExternalLink size={16} />
-                          </a>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -417,10 +510,10 @@ const App: React.FC = () => {
                 {liveFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
                   <div key={ev.id} className="glass p-3 rounded-xl border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[9px] font-mono text-sky-500">{ev.timestamp.split(' ')[1]}</span>
+                      <span className="text-[9px] font-mono text-sky-500">{getRelativeTimeLabel(ev.timestamp)}</span>
                       <span className="px-1.5 py-0.5 rounded-[4px] bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">Critical</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1">{ev.title}</h4>
+                    <h4 title={ev.title} className="text-xs font-bold text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1 truncate">{ev.title}</h4>
                     <div className="flex items-center text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                       <span>{ev.company}</span>
                       <span className="mx-1.5 opacity-20">|</span>
@@ -468,6 +561,20 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3">
+          <Link
+            to="/"
+            className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-300 border border-slate-800 transition-all active:scale-95"
+          >
+            <Home size={12} />
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+          <button
+            onClick={resetDashboard}
+            className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-300 border border-slate-800 transition-all active:scale-95"
+          >
+            <RefreshCw size={12} />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
           <button
             onClick={() => setShowInjectModal(true)}
             className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-sky-400 border border-slate-800 transition-all active:scale-95"
@@ -498,10 +605,10 @@ const App: React.FC = () => {
               {liveFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
                 <div key={ev.id} className="glass p-3 rounded-xl border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-mono text-sky-500">{ev.timestamp.split(' ')[1]}</span>
+                    <span className="text-[9px] font-mono text-sky-500">{getRelativeTimeLabel(ev.timestamp)}</span>
                     <span className="px-1.5 py-0.5 rounded-[4px] bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">Critical</span>
                   </div>
-                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1">{ev.title}</h4>
+                  <h4 title={ev.title} className="text-xs font-bold text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1 truncate">{ev.title}</h4>
                   <div className="flex items-center text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                     <span>{ev.company}</span>
                     <span className="mx-1.5 opacity-20">|</span>
@@ -546,7 +653,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                  {(recommendations.length > 0 ? recommendations : [
+                  {(Array.isArray(recommendations) && recommendations.length > 0 ? recommendations : [
                     { label: "NVIDIA-TSMC Pipeline", query: "Any new NVIDIA-TSMC contract today?", icon: Zap, color: "text-amber-400" },
                     { label: "Foundry Design Wins", query: "Status of Intel 18A design wins and foundry clients?", icon: CheckCircle2, color: "text-emerald-400" },
                     { label: "AI Infra Analysis", query: "What is the impact of Meta's new AI infra updates?", icon: Cpu, color: "text-sky-400" },
@@ -605,7 +712,7 @@ const App: React.FC = () => {
                             if (isOnline) {
                               setLoading(false);
                               // Retry the query if it was a query failure
-                              if (query) handleSubmit(query);
+                              if (lastSubmittedQuery) handleSubmit(lastSubmittedQuery);
                             } else {
                               setLoading(false);
                               setError("Backend still offline. Please ensure server is running on port 8000.");
@@ -675,7 +782,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* INSIGHT SECTION */}
-                {queryResult && queryResult.evidence.length > 0 && (
+                {queryResult && (
                   <div className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center space-x-2 mb-4">
                       <div className="p-1.5 bg-indigo-500/20 rounded-lg">
@@ -684,8 +791,17 @@ const App: React.FC = () => {
                       <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest">Strategic Insight</h3>
                     </div>
                     {insight ? (
-                      <div className="max-w-none">
+                      <div className="max-w-none space-y-3">
                         <StrategicInsightReport data={insight} />
+                        {isInsightUnavailable && (
+                          <button
+                            onClick={retryInsight}
+                            className="inline-flex items-center space-x-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-md text-[10px] font-black uppercase tracking-widest border border-indigo-500/30 transition-all"
+                          >
+                            <RefreshCw size={12} />
+                            <span>Try Again</span>
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center space-x-3 text-slate-400">
@@ -697,14 +813,14 @@ const App: React.FC = () => {
                 )}
 
                 <div className="space-y-6">
-                  {queryResult.evidence.length === 0 ? (
+                  {evidenceItems.length === 0 ? (
                     <div className="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 text-center">
                       <ShieldAlert size={32} className="mx-auto text-slate-600 mb-4" />
                       <h3 className="text-lg font-bold text-slate-400 mb-2">No Direct Evidence Found</h3>
                       <p className="text-slate-500 text-sm">The current data stream does not contain specific signals matching your query parameters.</p>
                     </div>
                   ) : (
-                    queryResult.evidence.map((item, idx) => (
+                    evidenceItems.map((item, idx) => (
                       <div key={idx} className="glass p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center space-x-3">
@@ -714,7 +830,7 @@ const App: React.FC = () => {
                             <div>
                               <h3 className="text-base font-bold text-slate-200 group-hover:text-white transition-colors">{item.title}</h3>
                               <div className="flex items-center space-x-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
-                                <span>{item.source || 'Unknown Source'}</span>
+                                <SourceBadge source={item.source} size="sm" />
                                 <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
                                 <span>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</span>
                               </div>
@@ -807,8 +923,9 @@ const App: React.FC = () => {
                     <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active: <span className="text-emerald-500">{liveFeed.length}</span></span>
                   </div>
                 </div>
-                <div className="hidden sm:flex items-center space-x-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                <div className="hidden sm:flex items-center space-x-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">
                   <span className="text-sky-500/60 font-mono">GEMINI_ACTIVE</span>
+                  <UserButton afterSignOutUrl="/sign-in" />
                 </div>
               </div>
             </div>
@@ -816,6 +933,172 @@ const App: React.FC = () => {
         </section>
       </main>
     </div>
+  );
+};
+
+const HomePage: React.FC = () => {
+  return (
+    <div className="min-h-screen flex flex-col text-slate-200 relative overflow-hidden">
+      <BackgroundLayer />
+      <header className="h-16 border-b border-slate-800/60 flex items-center justify-between px-4 md:px-6 bg-slate-950/40 backdrop-blur-xl">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 bg-sky-600 rounded flex items-center justify-center shadow-[0_0_15px_rgba(2,132,199,0.3)]">
+            <Cpu size={18} className="text-white" />
+          </div>
+          <div className="leading-tight">
+            <h1 className="text-sm font-black tracking-tighter uppercase text-white flex items-center">
+              Silicon<span className="text-sky-500">Pulse</span>
+            </h1>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Home Node</span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <SignedIn>
+            <Link
+              to="/dashboard"
+              className="flex items-center space-x-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-300 border border-slate-800 transition-all"
+            >
+              <Home size={12} />
+              <span>Dashboard</span>
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <Link
+              to="/sign-in"
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-300 border border-slate-800 transition-all"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/sign-up"
+              className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 rounded-md text-[10px] font-black uppercase tracking-widest text-white transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)]"
+            >
+              Create Account
+            </Link>
+          </SignedOut>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="max-w-4xl w-full text-center space-y-8">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-sky-500/10 border border-sky-500/20 rounded-full text-sky-400 text-[10px] font-black uppercase tracking-widest">
+            <Zap size={12} />
+            <span>Real-Time Strategic Intelligence</span>
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-tight">
+            Signal-First Intelligence for the Semiconductor Stack
+          </h2>
+          <p className="text-slate-500 text-base md:text-lg font-medium max-w-2xl mx-auto">
+            Monitor live supply chain signals, competitive shifts, and macro events with a tactical, evidence-driven briefing system.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <SignedIn>
+              <Link
+                to="/dashboard"
+                className="flex items-center space-x-2 px-5 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(14,165,233,0.4)]"
+              >
+                <span>Enter Dashboard</span>
+                <ArrowRight size={14} />
+              </Link>
+            </SignedIn>
+            <SignedOut>
+              <Link
+                to="/sign-up"
+                className="flex items-center space-x-2 px-5 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(14,165,233,0.4)]"
+              >
+                <span>Get Started</span>
+                <ArrowRight size={14} />
+              </Link>
+              <Link
+                to="/sign-in"
+                className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-slate-800"
+              >
+                Sign In
+              </Link>
+            </SignedOut>
+          </div>
+        </div>
+      </main>
+
+      <section className="px-6 pb-12">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            {
+              title: 'Live Signal Radar',
+              description: 'Continuous ingestion of high-impact market and supply chain events.',
+              icon: Activity,
+              color: 'text-emerald-400'
+            },
+            {
+              title: 'Strategic Reports',
+              description: 'Evidence-backed analysis with competitor impact and outlook.',
+              icon: FileText,
+              color: 'text-sky-400'
+            },
+            {
+              title: 'Source Verification',
+              description: 'Transparent trust scores and supporting provenance.',
+              icon: ShieldAlert,
+              color: 'text-amber-400'
+            }
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.title} className="glass p-5 rounded-2xl border-slate-800/60 bg-slate-950/40">
+                <div className={`p-2 w-fit bg-slate-900 rounded-lg ${item.color}`}>
+                  <Icon size={16} />
+                </div>
+                <h3 className="mt-3 text-sm font-black text-white uppercase tracking-widest">{item.title}</h3>
+                <p className="mt-2 text-xs text-slate-500 leading-relaxed">{item.description}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route
+          path="/sign-in/*"
+          element={
+            <div className="flex bg-slate-950 items-center justify-center h-screen w-screen">
+              <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl="/dashboard" />
+            </div>
+          }
+        />
+        <Route
+          path="/sign-up/*"
+          element={
+            <div className="flex bg-slate-950 items-center justify-center h-screen w-screen">
+              <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl="/dashboard" />
+            </div>
+          }
+        />
+        <Route
+          path="/dashboard/*"
+          element={
+            <>
+              <SignedIn>
+                <Dashboard />
+              </SignedIn>
+              <SignedOut>
+                <Navigate to="/sign-in" replace />
+              </SignedOut>
+            </>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 

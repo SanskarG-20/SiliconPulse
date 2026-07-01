@@ -4,4 +4,13 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 python-dotenv==1.0.1
 google-generativeai==0.8.3
+PyJWT[crypto]==2.10.1
+supabase==2.15.1
+httpx==0.27.0
+requests==2.32.3
+APScheduler==3.10.4
+tenacity==8.5.0
 # pathway==0.11.0  # Note: Pathway requires Linux/WSL or macOS. Use mock_pathway_pipeline.py on Windows.
+pytest==8.0.0
+pytest-asyncio==0.23.5
+httpx==0.27.0

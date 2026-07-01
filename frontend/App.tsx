@@ -291,7 +291,13 @@ const Dashboard: React.FC = () => {
   const evidenceItems = Array.isArray(queryResult?.evidence) ? queryResult.evidence : [];
   const isInsightUnavailable = typeof insight === 'string' && insight.toLowerCase().includes('unavailable');
 
-  const filteredFeed = feedFilter ? liveFeed.filter(f => f.company === feedFilter) : liveFeed;
+  const filteredFeed = feedFilter 
+    ? liveFeed.filter(f => 
+        (f.company || '').toLowerCase().includes(feedFilter.toLowerCase()) || 
+        (f.title || '').toLowerCase().includes(feedFilter.toLowerCase()) ||
+        (f.event_type || '').toLowerCase().includes(feedFilter.toLowerCase())
+      ) 
+    : liveFeed;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
@@ -573,6 +579,21 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3">
+          <div className="relative hidden lg:block mr-2">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Filter live feed..."
+              value={feedFilter}
+              onChange={(e) => setFeedFilter(e.target.value)}
+              className="pl-7 pr-6 py-1.5 bg-slate-900 border border-slate-800 rounded-md text-[10px] text-slate-300 focus:outline-none focus:border-sky-500/50 w-32 focus:w-48 transition-all"
+            />
+            {feedFilter && (
+              <button onClick={() => setFeedFilter('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <X size={10} />
+              </button>
+            )}
+          </div>
           <Link
             to="/"
             className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-300 border border-slate-800 transition-all active:scale-95"

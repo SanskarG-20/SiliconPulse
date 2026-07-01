@@ -105,7 +105,8 @@ class GeminiClient:
                 continue
 
         # If we get here, all models failed
-        return f"**Insight Generation Unavailable**\n\nAll available models failed. Errors: {'; '.join(errors)}"
+        logger.error(f"All Gemini models failed. Errors: {'; '.join(errors)}")
+        return "Insight generation unavailable. Please try again later."
 
     def list_available_models(self) -> list[dict]:
         """List available models and their methods."""

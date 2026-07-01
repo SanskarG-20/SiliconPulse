@@ -69,14 +69,16 @@ def compute_event_id(event: dict) -> str:
         
     return hashlib.sha256(unique_str.encode()).hexdigest()
 
-def parse_timestamp(ts: str) -> datetime:
+def parse_timestamp(ts: Any) -> datetime:
     """Parse ISO timestamp with fallback"""
     try:
+        if not ts or not isinstance(ts, str):
+            return datetime.utcnow()
         # Handle "Z" suffix
         if ts.endswith('Z'):
             ts = ts[:-1]
         return datetime.fromisoformat(ts)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, Exception):
         # Fallback to now if invalid
         return datetime.utcnow()
 
@@ -179,15 +181,22 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: Optional[int]
                 try:
                     event = json.loads(line)
                     if isinstance(event, dict):
-                        # Check freshness if required
-                        # if freshness_hours is not None:
-                        #    if not is_fresh(event.get('timestamp'), freshness_hours):
-                        #        continue
-                                
+                        title = str(event.get("title") or "").strip()
+                        if not title:
+                            continue
+
+                        event.setdefault("timestamp", get_current_timestamp())
+                        event.setdefault("source", "Unknown")
+                        event.setdefault("snippet", str(event.get("content") or title)[:300])
+                        event.setdefault("content", event.get("snippet") or title)
+
+                        if freshness_hours is not None and not is_fresh(event.get("timestamp", ""), freshness_hours):
+                            continue
+
                         events.append(event)
                         if len(events) >= limit:
                             break
-                except:
+                except Exception:
                     continue
         
         # Reverse back to chronological order (oldest to newest) if that's what caller expects

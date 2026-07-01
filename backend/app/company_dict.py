@@ -47,5 +47,21 @@ COMPANY_DICT = {
   "Samsung": {
     "aliases": ["samsung", "hbm3e", "exynos", "foundry", "galaxy"],
     "topics": ["HBM supply", "foundry progress", "yield", "memory chips"]
+  },
+  "OpenAI": {
+    "aliases": ["openai", "chatgpt", "gpt-4", "gpt-4o", "sora", "sam altman"],
+    "topics": ["AGI", "AI model releases", "partnerships", "funding"]
+  },
+  "Anthropic": {
+    "aliases": ["anthropic", "claude", "claude 3", "dario amodei"],
+    "topics": ["AI safety", "AI model releases", "cloud partnerships"]
+  },
+  "xAI": {
+    "aliases": ["xai", "grok", "elon musk"],
+    "topics": ["AI model releases", "compute clusters", "funding"]
+  },
+  "SpaceX": {
+    "aliases": ["spacex", "starlink", "starship", "falcon 9", "elon musk"],
+    "topics": ["rocket launches", "satellite internet", "aerospace contracts"]
   }
 }

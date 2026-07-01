@@ -31,6 +31,8 @@ SIGNAL_QUERIES = [
     "Google Meta Microsoft AI infrastructure",
     "ASML EUV lithography fab",
     "chip shortage export controls CHIPS act",
+    "OpenAI Anthropic xAI AI models",
+    "SpaceX Amazon satellite aerospace",
 ]
 
 

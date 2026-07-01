@@ -12,9 +12,42 @@ import logging
 # Import storage module (circular import avoidance handled by function calls)
 # We'll import inside functions where needed or rely on caller to pass dependencies if strict separation required
 # But for this app structure, direct import is fine as storage doesn't import utils
-from app import storage
+from . import storage
 
 logger = logging.getLogger(__name__)
+
+import re
+
+def extract_companies(text: str) -> list[str]:
+    """
+    Extract organization names from text using basic regex heuristics.
+    (Spacy was blocked by Windows Application Control policies).
+    """
+    if not text:
+        return []
+        
+    # Matches consecutive capitalized words, optionally with & or -
+    pattern = r'\b[A-Z][a-zA-Z0-9]+(?: [&-] [A-Z][a-zA-Z0-9]+)*\b'
+    matches = re.findall(pattern, text)
+    
+    # Filter out common stop words that get capitalized at sentence starts
+    stopwords = {"The", "A", "An", "In", "On", "At", "To", "From", "By", "With", "As", "It", "This", "That", "For", "But", "And", "Or", "If", "When"}
+    
+    companies = []
+    for m in matches:
+        if m not in stopwords and len(m) > 2:
+            companies.append(m)
+            
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for c in companies:
+        cl = c.lower()
+        if cl not in seen:
+            seen.add(cl)
+            unique.append(c)
+            
+    return unique
 
 def get_current_timestamp() -> str:
     """Get current timestamp in ISO format"""

@@ -9,8 +9,7 @@ from typing import Optional
 import httpx
 
 from ..settings import settings
-from ..utils import deduplicate_and_append, get_current_timestamp
-from ..company_dict import COMPANY_DICT
+from ..utils import deduplicate_and_append, get_current_timestamp, extract_companies
 
 logger = logging.getLogger(__name__)
 
@@ -25,27 +24,20 @@ CACHE_TTL_SECONDS = 45
 _cache: dict[str, tuple[list[dict], datetime]] = {}
 
 SIGNAL_QUERIES = [
-    "semiconductor chip manufacturing",
-    "NVIDIA TSMC Intel AMD AI GPU",
-    "Apple Samsung chip supply chain",
-    "Google Meta Microsoft AI infrastructure",
-    "ASML EUV lithography fab",
-    "chip shortage export controls CHIPS act",
-    "OpenAI Anthropic xAI AI models",
-    "SpaceX Amazon satellite aerospace",
+    "tech startup funding",
+    "AI startup launch",
+    "semiconductor manufacturing company",
+    "tech acquisition merger",
+    "cloud infrastructure company",
+    "new technology product announcement"
 ]
 
 
 def _map_company(text: str) -> Optional[str]:
-    if not text:
-        return None
-    text_lower = text.lower()
-    for company, data in COMPANY_DICT.items():
-        if company.lower() in text_lower:
-            return company
-        for alias in data.get("aliases", []):
-            if alias.lower() in text_lower:
-                return company
+    """Dynamically extract the primary company name from text using NLP/Regex heuristics."""
+    companies = extract_companies(text)
+    if companies:
+        return companies[0]
     return None
 
 

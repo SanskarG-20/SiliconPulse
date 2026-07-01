@@ -1,36 +1,64 @@
-from fastapi import APIRouter, HTTPException, Response
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Response
 from datetime import datetime
 import json
 import os
 from pathlib import Path
 
-import google.generativeai as genai
-from app.models import (
+from .models import (
     QueryRequest, QueryResponse, InjectRequest, InjectResponse, 
-    EvidenceItem, SignalCompact, RadarStatus, GenerateRequest, 
+    EvidenceItem, RadarStatus, GenerateRequest, 
     GenerateResponse, ExportRequest, SourceVerifyResponse, SourceVerifyItem
 )
-from app.settings import settings
-from app.sources.perplexity_source import pull_perplexity_signals
-from app.sources.x_source import pull_x_signals
-from app.utils import (
+from .settings import settings
+from .sources.gdelt_source import pull_gdelt_signals
+from .sources.hackernews_source import pull_hn_signals
+from .services.news_sources import (
+    async_pull_newsdata, async_pull_newsapi, async_pull_gnews, async_pull_mediastack,
+    ingest_news_stream,
+)
+from .utils import (
     safe_read_jsonl, 
     compute_confidence,
     get_trust_info,
     now_ts, 
     compute_event_id, 
-    compute_recency_boost, 
-    normalize_text, 
     deduplicate_and_append,
-    format_error_response
 )
-from app.services.gemini_client import gemini_client
-from app.demo_generator import DemoGenerator
-from app import storage
+from .services.gemini_client import gemini_client
+from .demo_generator import DemoGenerator
+from . import storage
+from .core.auth import get_current_user
+from .supabase_client import (
+    ensure_user,
+    insert_insight_record,
+    insert_query_record,
+    insert_signal_record,
+)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 import logging
 logger = logging.getLogger(__name__)
+
+
+@router.get("/auth/me")
+async def auth_me(user=Depends(get_current_user)):
+    """Sync authenticated user to Supabase and return user identity."""
+    user_id = user.get("user_id")
+    user_email = user.get("email")  # Now extracted directly from JWT in auth dependency
+
+    if user_id:
+        logger.info(f"Syncing user {user_id} with email {user_email} to Supabase")
+        ensure_user(user_id, user_email)
+    else:
+        logger.warning("auth/me called but no user_id in token")
+
+    return {
+        "authenticated": True,
+        "user_id": user_id,
+        "email": user_email,
+        "session_id": user.get("session_id"),
+    }
 
 
 # Bootstrap endpoint
@@ -94,7 +122,7 @@ async def get_signals():
 
 # Inject endpoint
 @router.post("/inject", response_model=InjectResponse)
-async def inject_signal(request: InjectRequest):
+async def inject_signal(request: InjectRequest, user=Depends(get_current_user)):
     """
     Inject a new data item into the stream.
     
@@ -128,6 +156,19 @@ async def inject_signal(request: InjectRequest):
             
         # Mark as seen
         storage.mark_seen(event_id, request.source, request.title)
+
+        # Persist manual signal in Supabase (optional if Supabase vars are configured)
+        user_id = user.get("user_id")
+        user_email = user.get("email")
+        if user_id:
+            ensure_user(user_id, user_email)
+            insert_signal_record(
+                user_id=user_id,
+                source=request.source,
+                title=request.title,
+                content=request.content,
+                timestamp=injected_at,
+            )
         
         return InjectResponse(
             status="success",
@@ -154,7 +195,7 @@ async def inject_signal(request: InjectRequest):
 
 # Query endpoint
 @router.post("/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest):
+async def process_query(request: QueryRequest, user=Depends(get_current_user)):
     """
     Process a query and retrieve top-k evidence from the data stream.
     
@@ -172,11 +213,22 @@ async def process_query(request: QueryRequest):
     
     request_id = str(uuid.uuid4())[:8]
     start_time = time.time()
+    user_id = user.get("user_id")
+    user_email = user.get("email")
     
     try:
         # Check query cache first
         cached_result = query_cache.get(request.query, request.k)
         if cached_result:
+            if user_id:
+                ensure_user(user_id, user_email)
+                insert_query_record(
+                    user_id=user_id,
+                    query_text=request.query,
+                    k=request.k,
+                    evidence_count=len(cached_result.get("evidence", [])),
+                    signal_strength=cached_result.get("signal_strength", 0),
+                )
             logger.info(f"[{request_id}] Cache HIT - {request.query[:50]} - {(time.time() - start_time)*1000:.1f}ms")
             return QueryResponse(**cached_result)
         
@@ -192,6 +244,15 @@ async def process_query(request: QueryRequest):
                 "signal_strength": 0,
                 "last_updated": datetime.now().isoformat()
             }
+            if user_id:
+                ensure_user(user_id, user_email)
+                insert_query_record(
+                    user_id=user_id,
+                    query_text=request.query,
+                    k=request.k,
+                    evidence_count=0,
+                    signal_strength=0,
+                )
             query_cache.set(request.query, request.k, result)
             return QueryResponse(**result)
         
@@ -300,6 +361,16 @@ async def process_query(request: QueryRequest):
         
         # Update cache
         query_cache.set(request.query, request.k, result)
+
+        if user_id:
+            ensure_user(user_id, user_email)
+            insert_query_record(
+                user_id=user_id,
+                query_text=request.query,
+                k=request.k,
+                evidence_count=len(evidence_list),
+                signal_strength=result["signal_strength"],
+            )
         
         logger.info(f"[{request_id}] Query END - Found {len(evidence_list)} items - {(time.time() - start_time)*1000:.1f}ms")
         return QueryResponse(**result)
@@ -360,10 +431,10 @@ async def get_radar():
                 count=count
             ))
             
-        # Sort by count descending
+        # Sort by count descending and limit to top 15 to prevent UI clutter
         radar_list.sort(key=lambda x: x.count, reverse=True)
         
-        return radar_list
+        return radar_list[:15]
         
     except Exception as e:
         print(f"Radar Error: {e}")
@@ -372,14 +443,27 @@ async def get_radar():
 
 # Generate endpoint
 @router.post("/generate", response_model=GenerateResponse)
-async def generate_insight(request: GenerateRequest):
+async def generate_insight(request: GenerateRequest, user=Depends(get_current_user)):
     """
     Generate insight using Gemini based on query and context.
     """
     try:
+        user_id = user.get("user_id")
+        user_email = user.get("email")
+
         # Check for API key first
         if not settings.gemini_api_key:
-             return GenerateResponse(insight="**Simulation Mode**\n\nGemini API Key is missing. Please configure `GEMINI_API_KEY` in `.env` for live AI insights.\n\nBased on the available signals, market activity appears elevated with significant movement in the semiconductor sector.")
+             fallback_text = "**Simulation Mode**\n\nGemini API Key is missing. Please configure `GEMINI_API_KEY` in `.env` for live AI insights.\n\nBased on the available signals, market activity appears elevated with significant movement in the semiconductor sector."
+             if user_id:
+                 ensure_user(user_id, user_email)
+                 insert_insight_record(
+                     user_id=user_id,
+                     query_text=request.query,
+                     insight=fallback_text,
+                     model_name=settings.gemini_model,
+                     status="simulated",
+                 )
+             return GenerateResponse(insight=fallback_text)
 
         # 1. Gating Logic: Check evidence count
         # We estimate evidence count by looking for the separator pattern used in frontend
@@ -445,7 +529,17 @@ async def generate_insight(request: GenerateRequest):
                     }
                 ]
             }
-            return GenerateResponse(insight=json.dumps(fallback_report))
+            fallback_json = json.dumps(fallback_report)
+            if user_id:
+                ensure_user(user_id, user_email)
+                insert_insight_record(
+                    user_id=user_id,
+                    query_text=request.query,
+                    insight=fallback_json,
+                    model_name=settings.gemini_model,
+                    status="fallback",
+                )
+            return GenerateResponse(insight=fallback_json)
 
         # NEW RULE: If evidence_count >= 1, ALWAYS generate report
         prompt = f"""
@@ -498,11 +592,33 @@ async def generate_insight(request: GenerateRequest):
             logger.warning("Gemini output invalid JSON, attempting repair or fallback.")
             pass
             
+        if user_id:
+            ensure_user(user_id, user_email)
+            insert_insight_record(
+                user_id=user_id,
+                query_text=request.query,
+                insight=insight_text,
+                model_name=settings.gemini_model,
+                status="success",
+            )
+
         return GenerateResponse(insight=insight_text)
         
     except Exception as e:
         logger.error(f"Gemini Generation Failed: {e}")
-        return GenerateResponse(insight=f"**Insight Generation Unavailable**\n\nWe encountered an issue connecting to the intelligence engine. However, the live data above remains accurate.\n\n*System Note: {str(e)}*")
+        failed_text = f"**Insight Generation Unavailable**\n\nWe encountered an issue connecting to the intelligence engine. However, the live data above remains accurate.\n\n*System Note: {str(e)}*"
+        user_id = user.get("user_id")
+        user_email = user.get("email")
+        if user_id:
+            ensure_user(user_id, user_email)
+            insert_insight_record(
+                user_id=user_id,
+                query_text=request.query,
+                insight=failed_text,
+                model_name=settings.gemini_model,
+                status="failed",
+            )
+        return GenerateResponse(insight=failed_text)
 
 
 # LLM Health Endpoints
@@ -518,35 +634,57 @@ async def list_llm_models():
 
 
 # Source endpoints
-@router.post("/sources/perplexity/pull")
-async def pull_perplexity():
-    """Trigger Perplexity signal pull"""
+@router.post("/sources/newsdata/pull")
+async def pull_newsdata_endpoint():
+    """Trigger NewsData.io signal pull"""
     try:
-        count = pull_perplexity_signals()
-        return {"status": "ok", "source": "Perplexity", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
+        count = await async_pull_newsdata()
+        return {"status": "ok", "source": "NewsData.io", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/sources/x/pull")
-async def pull_x():
-    """Trigger X signal pull"""
+@router.post("/sources/newsapi/pull")
+async def pull_newsapi_endpoint():
+    """Trigger NewsAPI signal pull"""
     try:
-        count = pull_x_signals()
-        return {"status": "ok", "source": "X", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
+        count = await async_pull_newsapi()
+        return {"status": "ok", "source": "NewsAPI", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sources/gnews/pull")
+async def pull_gnews_endpoint():
+    """Trigger GNews signal pull"""
+    try:
+        count = await async_pull_gnews()
+        return {"status": "ok", "source": "GNews", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sources/mediastack/pull")
+async def pull_mediastack_endpoint():
+    """Trigger Mediastack signal pull"""
+    try:
+        count = await async_pull_mediastack()
+        return {"status": "ok", "source": "Mediastack", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sources/pull_all")
 async def pull_all_sources():
-    """Trigger all signal sources"""
+    """Trigger all signal sources (News APIs + GDELT + HackerNews)"""
     try:
-        p_count = pull_perplexity_signals()
-        x_count = pull_x_signals()
+        news_result, gdelt_count, hn_count = await asyncio.gather(
+            ingest_news_stream(),
+            asyncio.to_thread(pull_gdelt_signals),
+            asyncio.to_thread(pull_hn_signals),
+        )
         return {
-            "status": "ok", 
+            "status": "ok",
             "pulled": {
-                "Perplexity": p_count,
-                "X": x_count
+                "NewsAPIs": news_result,
+                "GDELT": gdelt_count or 0,
+                "HackerNews": hn_count or 0
             },
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
@@ -801,3 +939,68 @@ async def verify_sources(query: str):
     except Exception as e:
         logger.error(f"Source verification failed: {e}")
         return SourceVerifyResponse(query=query, sources=[])
+
+
+# Diagnostic endpoint to verify user data persistence
+@router.get("/user/diagnostics")
+async def user_diagnostics(user=Depends(get_current_user)):
+    """
+    Returns the latest user data stored in Supabase.
+    Useful for debugging user sync and data persistence.
+    """
+    from app.supabase_client import get_supabase_client
+    
+    user_id = user.get("user_id")
+    user_email = user.get("email")
+    
+    if not user_id:
+        return {
+            "status": "error",
+            "message": "No user_id in token"
+        }
+    
+    client = get_supabase_client()
+    if client is None:
+        return {
+            "status": "error",
+            "message": "Supabase client not configured"
+        }
+    
+    try:
+        # Get user record
+        user_response = client.table("users").select("*").eq("id", user_id).single().execute()
+        user_record = user_response.data if user_response.data else None
+        
+        # Get latest query records (limit 5)
+        queries_response = client.table("queries").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        queries = queries_response.data or []
+        
+        # Get latest insight records (limit 5)
+        insights_response = client.table("insights").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        insights = insights_response.data or []
+        
+        # Get latest signal records (limit 5)
+        signals_response = client.table("signals").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        signals = signals_response.data or []
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "user_record": user_record,
+            "statistics": {
+                "total_queries": len(queries),
+                "total_insights": len(insights),
+                "total_signals": len(signals)
+            },
+            "recent_queries": queries,
+            "recent_insights": insights[:3],  # Show only first 3 to keep response size reasonable
+            "recent_signals": signals[:3],
+            "message": "All user data from Supabase"
+        }
+    except Exception as exc:
+        logger.error(f"Diagnostics failed for user {user_id}: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "user_id": user_id,
+            "message": f"Failed to fetch user data: {str(exc)}"
+        }

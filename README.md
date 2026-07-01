@@ -30,7 +30,7 @@ SiliconPulse addresses the **information overload** in the fast-moving tech sect
 ## 🚀 Key Features
 
 ### 1. 📡 Live Pulse Feed
-A real-time ticker of market signals. It ingests data from simulated and live sources (Perplexity, X) and deduplicates it on the fly with a 12-hour freshness window.
+A real-time ticker of market signals. It ingests data from live sources (NewsData.io, NewsAPI.org, GNews, Mediastack, GDELT) and deduplicates it on the fly with a 12-hour freshness window.
 
 ### 2. 🧠 Strategic Insight Engine
 Powered by **Gemini**, this engine takes raw signals and generates a structured report:
@@ -60,7 +60,7 @@ SiliconPulse uses a decoupled architecture designed for high-velocity data with 
 ```mermaid
 graph TD
     subgraph "Data Ingestion Layer"
-        Sources[Perplexity / X / Manual Inject] -->|Write| RawStream[data/stream.jsonl]
+        Sources[News APIs / GDELT / Manual Inject] -->|Write| RawStream[data/stream.jsonl]
         RawStream -->|Continuous Read| Pathway[Pathway Pipeline]
         Pathway -->|Normalize + Dedup + Enrich| ProcessedStream[data/pathway_out.jsonl]
     end
@@ -85,7 +85,7 @@ graph TD
 ```
 
 ### Request Flow:
-1.  **Ingest**: Live sources (Perplexity, X) and manual injections write to `data/stream.jsonl`.
+1.  **Ingest**: Live sources (News APIs, GDELT) and manual injections write to `data/stream.jsonl`.
 2.  **Process**: Pathway continuously reads the raw stream, normalizes data, deduplicates by `event_id`, enriches with company/event_type tags, and writes to `data/pathway_out.jsonl`.
 3.  **Retrieve**: FastAPI's `QueryEngine` reads from the processed stream (with automatic fallback to raw stream if Pathway is unavailable).
 4.  **Synthesize**: Evidence is passed to Gemini with a strategic prompt → Structured JSON report is generated.
@@ -212,7 +212,7 @@ curl http://localhost:8000/api/signals
 - **Stream Processing**: **Pathway** (Real-time ingestion, deduplication, enrichment).
 - **AI/LLM**: Google Gemini 1.5 Flash (Primary) & 1.5 Pro (Fallback).
 - **Data/Storage**: JSONL (Streaming format), SQLite (Deduplication & Metadata).
-- **APIs**: Perplexity AI, X (Twitter) API.
+- **APIs**: NewsData.io, NewsAPI.org, GNews, Mediastack, GDELT.
 
 ---
 
@@ -225,7 +225,7 @@ siliconpulse/
 │   │   ├── routes.py       # API Endpoints
 │   │   ├── models.py       # Pydantic Schemas
 │   │   ├── services/       # Gemini Client
-│   │   ├── sources/        # Perplexity & X Integrations
+│   │   ├── sources/        # News API Integrations & GDELT
 │   │   ├── utils.py        # Confidence & Signal Logic (Pathway fallback)
 │   │   └── settings.py     # Environment Config (USE_PATHWAY)
 │   ├── data/               
@@ -266,7 +266,7 @@ SiliconPulse implements a **Reactive Intelligence Loop** powered by Pathway:
   
 - **Polling Mechanism**: The frontend refreshes the live feed every 5 seconds by calling `/api/signals`, ensuring the "Pulse" is always current.
 
-- **Background Scheduler**: The backend runs a task every 5 minutes to pull fresh signals from Perplexity and X, which are written to `stream.jsonl` and automatically picked up by Pathway.
+- **Background Scheduler**: The backend runs a task every 5 minutes to pull fresh signals from News APIs and GDELT, which are written to `stream.jsonl` and automatically picked up by Pathway.
 
 - **Inject Signal Reactivity**: When a user injects a custom signal via the UI:
   1. Signal is appended to `stream.jsonl`

@@ -1,4 +1,4 @@
-﻿
+
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { fetchRadar } from '../api/siliconpulseApi';
@@ -9,7 +9,11 @@ interface RadarItem {
   count: number;
 }
 
-export const CompanyRadar: React.FC = () => {
+interface CompanyRadarProps {
+  onCompanyClick?: (company: string) => void;
+}
+
+export const CompanyRadar: React.FC<CompanyRadarProps> = ({ onCompanyClick }) => {
   const [radarData, setRadarData] = useState<RadarItem[]>([]);
 
   useEffect(() => {
@@ -55,7 +59,11 @@ export const CompanyRadar: React.FC = () => {
           <div className="text-center py-4 text-slate-600 text-xs">Scanning...</div>
         ) : (
           radarData.map((item) => (
-            <div key={item.company} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/40 transition-colors cursor-default">
+            <div 
+              key={item.company} 
+              onClick={() => onCompanyClick?.(item.company)}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
+            >
               <span className="text-sm font-medium text-slate-300">{item.company}</span>
               <div className="flex items-center space-x-3">
                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${item.activity_level === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :

@@ -35,6 +35,7 @@ const Dashboard: React.FC = () => {
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString());
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
+  const [feedFilter, setFeedFilter] = useState<string>('');
 
   // Injection Modal State
   const [showInjectModal, setShowInjectModal] = useState(false);
@@ -190,6 +191,14 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleCompanyClick = (company: string) => {
+    setFeedFilter(company);
+    const newQuery = `Recent activity and strategic impact of ${company}`;
+    setQuery(newQuery);
+    handleSubmit(newQuery);
+    setShowMobileMenu(false);
+  };
+
   const handleInjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!injectTitle.trim() || !injectContent.trim()) return;
@@ -260,6 +269,7 @@ const Dashboard: React.FC = () => {
     setError(null);
     setLoading(false);
     setLastSubmittedQuery('');
+    setFeedFilter('');
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -280,6 +290,8 @@ const Dashboard: React.FC = () => {
 
   const evidenceItems = Array.isArray(queryResult?.evidence) ? queryResult.evidence : [];
   const isInsightUnavailable = typeof insight === 'string' && insight.toLowerCase().includes('unavailable');
+
+  const filteredFeed = feedFilter ? liveFeed.filter(f => f.company === feedFilter) : liveFeed;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
@@ -499,7 +511,7 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
 
-            <CompanyRadar />
+            <CompanyRadar onCompanyClick={handleCompanyClick} />
 
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center">
@@ -507,7 +519,7 @@ const Dashboard: React.FC = () => {
                 High Priority Signals
               </h3>
               <div className="space-y-3">
-                {liveFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
+                {filteredFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
                   <div key={ev.id} className="glass p-3 rounded-xl border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[9px] font-mono text-sky-500">{getRelativeTimeLabel(ev.timestamp)}</span>
@@ -587,14 +599,14 @@ const Dashboard: React.FC = () => {
       </header>
 
       {/* LIVE SIGNALS ZONE */}
-      <LiveTicker events={liveFeed} />
+      <LiveTicker events={filteredFeed} />
 
       {/* CORE LAYOUT GRID */}
       <main className="flex-1 flex overflow-hidden">
 
         {/* RADAR ZONE (SIDEBAR) */}
         <aside className="w-80 border-r border-slate-800/40 bg-slate-950/20 p-6 space-y-8 hidden lg:block overflow-y-auto custom-scrollbar">
-          <CompanyRadar />
+          <CompanyRadar onCompanyClick={handleCompanyClick} />
 
           <div className="space-y-4">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center">
@@ -602,7 +614,7 @@ const Dashboard: React.FC = () => {
               High Priority Signals
             </h3>
             <div className="space-y-3">
-              {liveFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
+              {filteredFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
                 <div key={ev.id} className="glass p-3 rounded-xl border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[9px] font-mono text-sky-500">{getRelativeTimeLabel(ev.timestamp)}</span>
@@ -920,7 +932,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-1.5 md:space-x-2">
                     <TrendingUp size={10} className="text-emerald-500" />
-                    <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active: <span className="text-emerald-500">{liveFeed.length}</span></span>
+                    <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active: <span className="text-emerald-500">{filteredFeed.length}</span></span>
                   </div>
                 </div>
                 <div className="hidden sm:flex items-center space-x-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">

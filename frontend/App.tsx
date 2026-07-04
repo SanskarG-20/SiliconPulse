@@ -8,7 +8,7 @@ import {
   ExternalLink, BarChart3, HelpCircle, X,
   ArrowRight,
   Home, Moon, Sun,
-  Menu
+  Menu, Coffee
 } from 'lucide-react';
 import { LiveTicker } from './components/LiveTicker';
 import { CompanyRadar } from './components/CompanyRadar';

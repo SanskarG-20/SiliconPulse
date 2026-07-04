@@ -36,6 +36,7 @@ const Dashboard: React.FC = () => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
   const [feedFilter, setFeedFilter] = useState<string>('');
+  const [sourceTrustFilter, setSourceTrustFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     const saved = localStorage.getItem('siliconpulse_watchlist');
     return saved ? JSON.parse(saved) : [];
@@ -352,6 +353,11 @@ const Dashboard: React.FC = () => {
   };
 
   const evidenceItems = Array.isArray(queryResult?.evidence) ? queryResult.evidence : [];
+  const filteredEvidenceItems = evidenceItems.filter((item: any) => {
+    if (sourceTrustFilter === 'All') return true;
+    const tl = resolveTrustLevel(item.source, item.trust_level);
+    return tl === sourceTrustFilter;
+  });
   const isInsightUnavailable = typeof insight === 'string' && insight.toLowerCase().includes('unavailable');
 
   const filteredFeed = feedFilter 
@@ -930,15 +936,38 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
 
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center">
+                    <FileText size={14} className="mr-2 text-sky-500" /> Evidence Base
+                  </h3>
+                  <div className="flex space-x-1.5 md:space-x-2 overflow-x-auto no-scrollbar pb-1">
+                    {['All', 'High', 'Medium', 'Low'].map(level => (
+                      <button
+                        key={level}
+                        onClick={() => setSourceTrustFilter(level as any)}
+                        className={`whitespace-nowrap px-2 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded transition-colors border ${
+                          sourceTrustFilter === level 
+                            ? 'bg-sky-500/10 text-sky-400 border-sky-500/30 shadow-[0_0_10px_rgba(14,165,233,0.1)]' 
+                            : 'bg-slate-900/50 text-slate-500 hover:text-slate-300 border-slate-800/80 hover:bg-slate-800'
+                        }`}
+                      >
+                        {level === 'All' ? 'All Sources' : `${level} Trust`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-6">
-                  {evidenceItems.length === 0 ? (
+                  {filteredEvidenceItems.length === 0 ? (
                     <div className="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 text-center">
                       <ShieldAlert size={32} className="mx-auto text-slate-600 mb-4" />
                       <h3 className="text-lg font-bold text-slate-400 mb-2">No Direct Evidence Found</h3>
-                      <p className="text-slate-500 text-sm">The current data stream does not contain specific signals matching your query parameters.</p>
+                      <p className="text-slate-500 text-sm">The current data stream does not contain specific signals matching your query parameters and filters.</p>
                     </div>
                   ) : (
-                    evidenceItems.map((item, idx) => (
+                    filteredEvidenceItems.map((item: any, idx: number) => {
+                      const itemTrust = resolveTrustLevel(item.source, item.trust_level);
+                      return (
                       <div key={idx} className="glass p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center space-x-3">
@@ -948,6 +977,12 @@ const Dashboard: React.FC = () => {
                             <div>
                               <h3 className="text-base font-bold text-slate-200 group-hover:text-white transition-colors">{item.title}</h3>
                               <div className="flex items-center space-x-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] border ${itemTrust === 'High' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                  itemTrust === 'Medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                    'bg-red-500/10 text-red-500 border-red-500/20'
+                                  }`}>
+                                  {itemTrust}
+                                </span>
                                 <SourceBadge source={item.source} size="sm" />
                                 <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
                                 <span>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</span>
@@ -966,7 +1001,8 @@ const Dashboard: React.FC = () => {
                           </p>
                         )}
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 

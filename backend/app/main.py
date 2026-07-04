@@ -3,12 +3,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import router
-from app.models import QueryResponse
-from app.utils import now_ts
-from app.settings import settings
-from app.storage import init_db
-from app.scheduler import start_scheduler, stop_scheduler
+from .routes import router
+from .models import QueryResponse
+from .utils import now_ts
+from .settings import settings
+from .storage import init_db
+from .scheduler import start_scheduler, stop_scheduler
 
 # Configure logging
 logging.basicConfig(
@@ -27,12 +27,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1028,44 +1028,54 @@ const Dashboard: React.FC = () => {
                       <p className="text-slate-500 text-sm">The current data stream does not contain specific signals matching your query parameters and filters.</p>
                     </div>
                   ) : (
-                    filteredEvidenceItems.map((item: any, idx: number) => {
-                      const itemTrust = resolveTrustLevel(item.source, item.trust_level);
-                      return (
-                      <div key={idx} className="glass p-4 md:p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group active:scale-[0.98]">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-slate-900 rounded-lg text-sky-500 group-hover:text-sky-400 transition-colors">
-                              <FileText size={18} />
-                            </div>
-                            <div>
-                              <h3 className="text-base font-bold text-slate-200 group-hover:text-white transition-colors">{item.title}</h3>
-                              <div className="flex items-center space-x-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] border ${itemTrust === 'High' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                                  itemTrust === 'Medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                    'bg-red-500/10 text-red-500 border-red-500/20'
-                                  }`}>
-                                  {itemTrust}
-                                </span>
-                                <SourceBadge source={item.source} size="sm" />
-                                <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                                <span>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</span>
+                    <div className="relative border-l-2 border-slate-800 ml-4 md:ml-6 space-y-8 pb-4">
+                      {filteredEvidenceItems.map((item: any, idx: number) => {
+                        const itemTrust = resolveTrustLevel(item.source, item.trust_level);
+                        return (
+                          <div key={idx} className="relative pl-6 md:pl-8">
+                            <div className="absolute -left-[9px] top-6 w-4 h-4 rounded-full bg-slate-900 border-2 border-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.5)] z-10"></div>
+                            <div className="glass p-4 md:p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group active:scale-[0.98]">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center space-x-3">
+                                  <div className="p-2 bg-slate-900 rounded-lg text-sky-500 group-hover:text-sky-400 transition-colors">
+                                    <FileText size={18} />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-base font-bold text-slate-200 group-hover:text-white transition-colors">{item.title}</h3>
+                                    <div className="flex items-center space-x-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
+                                      <span className={`px-1.5 py-0.5 rounded text-[8px] border ${itemTrust === 'High' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                        itemTrust === 'Medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                          'bg-red-500/10 text-red-500 border-red-500/20'
+                                        }`}>
+                                        {itemTrust}
+                                      </span>
+                                      <SourceBadge source={item.source} size="sm" />
+                                      <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                                      <span>{item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                {item.company && (
+                                  <span className="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                                    {item.company}
+                                  </span>
+                                )}
                               </div>
+                              <p className="text-sm text-slate-400 leading-relaxed border-l-2 border-slate-800 pl-4">
+                                {item.content || item.snippet}
+                              </p>
+                              {item.url && (
+                                <p className="mt-4">
+                                  <a href={item.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-sky-400 hover:text-sky-300 flex items-center transition-colors">
+                                    <ExternalLink size={12} className="mr-1" /> View Source Document
+                                  </a>
+                                </p>
+                              )}
                             </div>
                           </div>
-                          {item.company && (
-                            <span className="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                              {item.company}
-                            </span>
-                          )}
-                        </div>
-                        {item.snippet && item.snippet !== "..." && item.snippet.length >= 20 && (
-                          <p className="text-sm text-slate-400 leading-relaxed pl-12 border-l-2 border-slate-800 group-hover:border-sky-500/30 transition-colors">
-                            {item.snippet}
-                          </p>
-                        )}
-                      </div>
-                      );
-                    })
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 

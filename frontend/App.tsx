@@ -53,11 +53,17 @@ const Dashboard: React.FC = () => {
   // Export & Verify State
   const [showExportModal, setShowExportModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [exportFormat, setExportFormat] = useState('md');
   const [includeEvidence, setIncludeEvidence] = useState(true);
+
+  // Daily Digest Modal State
+  const [showDigestModal, setShowDigestModal] = useState(false);
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [dailyDigest, setDailyDigest] = useState<string | null>(null);
   const [verifiedSources, setVerifiedSources] = useState<any[]>([]);
   const [verifying, setVerifying] = useState(false);
+
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const feedRotationRef = useRef(0);
@@ -260,6 +266,23 @@ const Dashboard: React.FC = () => {
       localStorage.setItem('siliconpulse_watchlist', JSON.stringify(next));
       return next;
     });
+  };
+
+  const generateDailyDigest = async () => {
+    setShowDigestModal(true);
+    setDigestLoading(true);
+    setDailyDigest(null);
+    try {
+      const result = await querySiliconPulse("Summarize the top 3 most strategic and high-impact tech events from the last 24 hours.");
+      const context = formatEvidenceToContext(result.evidence ?? []);
+      const insight = await generateInsight("Write a concise Morning Briefing detailing the top 3 tech events of the last 24 hours.", context);
+      setDailyDigest(insight);
+    } catch (err) {
+      console.error(err);
+      setDailyDigest("Failed to generate the morning briefing.");
+    } finally {
+      setDigestLoading(false);
+    }
   };
 
   const handleInjectSubmit = async (e: React.FormEvent) => {
@@ -574,6 +597,38 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* DIGEST MODAL */}
+      {showDigestModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-[#020617] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
+            <button
+              onClick={() => setShowDigestModal(false)}
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-6 border-b border-slate-800/50">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center">
+                <Coffee size={20} className="mr-2 text-emerald-500" /> Morning Briefing
+              </h3>
+            </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {digestLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <RefreshCw size={24} className="text-emerald-500 animate-spin" />
+                  <p className="text-slate-400 text-sm font-medium">Brewing your daily digest...</p>
+                </div>
+              ) : (
+                <div className="prose prose-invert prose-sm max-w-none text-slate-300">
+                  <ReactMarkdown>{dailyDigest || ''}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MOBILE DRAWER */}
       {showMobileMenu && (
         <div className="fixed inset-0 z-[110] lg:hidden animate-in fade-in duration-200">
@@ -687,6 +742,13 @@ const Dashboard: React.FC = () => {
           >
             <RefreshCw size={12} />
             <span className="hidden sm:inline">Reset</span>
+          </button>
+          <button
+            onClick={generateDailyDigest}
+            className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-emerald-400 border border-emerald-500/20 transition-all active:scale-95"
+          >
+            <Coffee size={12} />
+            <span className="hidden sm:inline">Digest</span>
           </button>
           <button
             onClick={() => setShowInjectModal(true)}

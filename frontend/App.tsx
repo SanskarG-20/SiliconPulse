@@ -7,7 +7,7 @@ import {
   AlertCircle, RefreshCw, Terminal, Clock,
   ExternalLink, BarChart3, HelpCircle, X,
   ArrowRight,
-  Home,
+  Home, Moon, Sun,
   Menu
 } from 'lucide-react';
 import { LiveTicker } from './components/LiveTicker';
@@ -64,6 +64,20 @@ const Dashboard: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const [isLightMode, setIsLightMode] = useState(() => {
+    return localStorage.getItem('siliconpulse_theme') === 'light';
+  });
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add('light-theme');
+      localStorage.setItem('siliconpulse_theme', 'light');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+      localStorage.setItem('siliconpulse_theme', 'dark');
+    }
+  }, [isLightMode]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const feedRotationRef = useRef(0);
@@ -750,6 +764,13 @@ const Dashboard: React.FC = () => {
           >
             <Coffee size={12} />
             <span className="hidden sm:inline">Digest</span>
+          </button>
+          <button
+            onClick={() => setIsLightMode(!isLightMode)}
+            className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-400 border border-slate-800 transition-all active:scale-95"
+            title="Toggle Theme"
+          >
+            {isLightMode ? <Moon size={12} /> : <Sun size={12} />}
           </button>
           <button
             onClick={() => setShowInjectModal(true)}

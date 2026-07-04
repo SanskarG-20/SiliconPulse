@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -55,6 +55,15 @@
 
         .fade-edge-x {
             mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+        }
+        
+        /* Light Theme Override */
+        html.light-theme {
+            filter: invert(1) hue-rotate(180deg);
+            background-color: #fff;
+        }
+        html.light-theme body {
+            background-color: #fdfdfd;
         }
     </style>
 </head>

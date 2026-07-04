@@ -201,6 +201,7 @@ const Dashboard: React.FC = () => {
     setQueryResult(null);
     setInsight(null);
     setLastSubmittedQuery(finalQuery.trim());
+    window.history.replaceState(null, '', `#q=${encodeURIComponent(finalQuery.trim())}`);
 
     try {
       // 1. Get Evidence FIRST - show immediately
@@ -235,6 +236,19 @@ const Dashboard: React.FC = () => {
     handleSubmit(newQuery);
     setShowMobileMenu(false);
   };
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#q=')) {
+      const q = decodeURIComponent(hash.substring(3));
+      if (q) {
+        setQuery(q);
+        // Delay to allow initial feed data to load if needed
+        setTimeout(() => handleSubmit(q), 500);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleWatchlist = (company: string, e?: React.MouseEvent) => {
     if (e) {
@@ -318,6 +332,7 @@ const Dashboard: React.FC = () => {
     setLoading(false);
     setLastSubmittedQuery('');
     setFeedFilter('');
+    window.history.replaceState(null, '', window.location.pathname);
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }

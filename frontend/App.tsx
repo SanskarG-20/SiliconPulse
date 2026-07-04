@@ -36,6 +36,10 @@ const Dashboard: React.FC = () => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
   const [feedFilter, setFeedFilter] = useState<string>('');
+  const [watchlist, setWatchlist] = useState<string[]>(() => {
+    const saved = localStorage.getItem('siliconpulse_watchlist');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Injection Modal State
   const [showInjectModal, setShowInjectModal] = useState(false);
@@ -197,6 +201,17 @@ const Dashboard: React.FC = () => {
     setQuery(newQuery);
     handleSubmit(newQuery);
     setShowMobileMenu(false);
+  };
+
+  const toggleWatchlist = (company: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setWatchlist(prev => {
+      const next = prev.includes(company) ? prev.filter(c => c !== company) : [...prev, company];
+      localStorage.setItem('siliconpulse_watchlist', JSON.stringify(next));
+      return next;
+    });
   };
 
   const handleInjectSubmit = async (e: React.FormEvent) => {
@@ -517,7 +532,11 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
 
-            <CompanyRadar onCompanyClick={handleCompanyClick} />
+            <CompanyRadar 
+              onCompanyClick={handleCompanyClick} 
+              watchlist={watchlist} 
+              onToggleWatchlist={toggleWatchlist} 
+            />
 
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center">
@@ -536,6 +555,13 @@ const Dashboard: React.FC = () => {
                       <span>{ev.company}</span>
                       <span className="mx-1.5 opacity-20">|</span>
                       <span>{ev.impactScore} IMPACT</span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); toggleWatchlist(ev.company); }}
+                        className={`ml-auto ${watchlist.includes(ev.company) ? 'text-sky-400' : 'text-slate-600 hover:text-sky-400'}`}
+                        title={watchlist.includes(ev.company) ? "Remove from Watchlist" : "Add to Watchlist"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill={watchlist.includes(ev.company) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -627,7 +653,11 @@ const Dashboard: React.FC = () => {
 
         {/* RADAR ZONE (SIDEBAR) */}
         <aside className="w-80 border-r border-slate-800/40 bg-slate-950/20 p-6 space-y-8 hidden lg:block overflow-y-auto custom-scrollbar">
-          <CompanyRadar onCompanyClick={handleCompanyClick} />
+          <CompanyRadar 
+            onCompanyClick={handleCompanyClick} 
+            watchlist={watchlist} 
+            onToggleWatchlist={toggleWatchlist} 
+          />
 
           <div className="space-y-4">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center">
@@ -646,6 +676,13 @@ const Dashboard: React.FC = () => {
                     <span>{ev.company}</span>
                     <span className="mx-1.5 opacity-20">|</span>
                     <span>{ev.impactScore} IMPACT</span>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); toggleWatchlist(ev.company); }}
+                      className={`ml-auto ${watchlist.includes(ev.company) ? 'text-sky-400' : 'text-slate-600 hover:text-sky-400'}`}
+                      title={watchlist.includes(ev.company) ? "Remove from Watchlist" : "Add to Watchlist"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill={watchlist.includes(ev.company) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+                    </button>
                   </div>
                 </div>
               ))}

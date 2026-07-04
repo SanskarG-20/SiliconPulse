@@ -62,6 +62,8 @@ const Dashboard: React.FC = () => {
   const feedRotationRef = useRef(0);
   const recommendationKeysRef = useRef<Set<string>>(new Set());
   const remoteRecommendationsRef = useRef<any[]>([]);
+  const seenSignalIdsRef = useRef<Set<string>>(new Set());
+  const initialFeedLoadedRef = useRef<boolean>(false);
 
   const notify = (message: string) => {
     setToast(message);
@@ -75,6 +77,37 @@ const Dashboard: React.FC = () => {
       setAuthTokenGetter(null);
     };
   }, [getToken]);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!initialFeedLoadedRef.current) {
+      if (liveFeed.length > 0 && liveFeed !== INITIAL_LIVE_FEED) {
+        liveFeed.forEach(ev => seenSignalIdsRef.current.add(ev.id));
+        initialFeedLoadedRef.current = true;
+      }
+      return;
+    }
+
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (watchlist.length === 0) return;
+
+    liveFeed.forEach(event => {
+      if (!seenSignalIdsRef.current.has(event.id)) {
+        seenSignalIdsRef.current.add(event.id);
+        
+        if (watchlist.includes(event.company) && event.impactScore > 75) {
+          new Notification(`SiliconPulse Alert: ${event.company}`, {
+            body: event.title,
+          });
+        }
+      }
+    });
+  }, [liveFeed, watchlist]);
 
   useEffect(() => {
     const init = async () => {

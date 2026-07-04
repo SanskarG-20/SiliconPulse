@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
-from app.settings import settings
+from .settings import settings
 
 logger = logging.getLogger(__name__)
 

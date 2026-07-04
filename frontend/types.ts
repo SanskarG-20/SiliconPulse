@@ -4,6 +4,8 @@ export interface LiveEvent {
   timestamp: string;
   source: string;
   title: string;
+  snippet?: string;
+  url?: string;
   content: string;
   impactScore: number;
   company: string;

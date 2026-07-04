@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
 import uuid
-from app.company_dict import COMPANY_DICT
+from .company_dict import COMPANY_DICT
 
 class DemoGenerator:
     def __init__(self):

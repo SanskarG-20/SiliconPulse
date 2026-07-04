@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import threading
 
-from app.settings import settings
+from .settings import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -50,7 +50,7 @@ export const StrategicInsightReport: React.FC<StrategicInsightReportProps> = ({ 
         report = data;
     }
 
-    if (!report || !report.sections) {
+    if (!report || !Array.isArray(report.sections)) {
         return (
             <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-slate-400 text-center">
                 Insufficient data to render report.
@@ -86,7 +86,7 @@ export const StrategicInsightReport: React.FC<StrategicInsightReportProps> = ({ 
 
                     <div className="pl-0 md:pl-11">
                         {/* Points List */}
-                        {section.points && (
+                        {Array.isArray(section.points) && (
                             <ul className="space-y-2 md:space-y-3 mb-4">
                                 {section.points.map((point, pIdx) => (
                                     <li key={pIdx} className="text-xs md:text-sm text-slate-400 leading-relaxed flex items-start">
@@ -98,7 +98,7 @@ export const StrategicInsightReport: React.FC<StrategicInsightReportProps> = ({ 
                         )}
 
                         {/* Evidence Chips */}
-                        {section.evidence && section.evidence.length > 0 && (
+                        {Array.isArray(section.evidence) && section.evidence.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3">
                                 {section.evidence.map((ev, eIdx) => (
                                     <div key={eIdx} className="flex items-center space-x-2 px-2 md:px-3 py-1 md:py-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wide text-slate-400 hover:border-sky-500/30 hover:text-sky-400 transition-colors cursor-default max-w-full overflow-hidden">

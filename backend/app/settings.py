@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     app_name: str = "SiliconPulse API"
+    clerk_issuer: str = os.getenv("CLERK_ISSUER", "")
+    clerk_audience: str = os.getenv("CLERK_AUDIENCE", "")
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
     gemini_fallback_models: list[str] = ["gemini-1.5-pro", "gemini-1.0-pro"]
@@ -28,24 +32,17 @@ class Settings(BaseSettings):
     use_pathway: bool = os.getenv("USE_PATHWAY", "True").lower() == "true"
     pathway_output_path: str = os.getenv("PATHWAY_OUTPUT_PATH", "data/pathway_out.jsonl")
     
-    # Perplexity Settings
-    perplexity_api_key: str = os.getenv("PERPLEXITY_API_KEY", "")
-    perplexity_enabled: bool = os.getenv("PERPLEXITY_ENABLED", "False").lower() == "true"
-    perplexity_queries: list[str] = [
-        "NVIDIA TSMC contract", 
-        "Apple semiconductor supply", 
-        "Intel foundry", 
-        "ASML EUV", 
-        "AI datacenter chips"
-    ]
+    # GDELT Settings (free API)
+    gdelt_enabled: bool = os.getenv("GDELT_ENABLED", "True").lower() == "true"
+    
+    # HackerNews Settings (free Algolia API)
+    hackernews_enabled: bool = os.getenv("HACKERNEWS_ENABLED", "True").lower() == "true"
 
-    # X (Twitter) Settings
-    x_bearer_token: str = os.getenv("X_BEARER_TOKEN", "")
-    x_enabled: bool = os.getenv("X_ENABLED", "False").lower() == "true"
-    x_keywords: list[str] = [
-        "TSMC", "NVIDIA", "CoWoS", "N2", "EUV", "HBM", "foundry", "chip deal", "acquisition"
-    ]
-    x_accounts: list[str] = ["nvidia", "tsmc", "intel", "apple", "GoogleAI", "MetaAI"]
+    # External news providers (free APIs)
+    newsdata_api_key: str = os.getenv("NEWSDATA_API_KEY", "")
+    newsapi_api_key: str = os.getenv("NEWSAPI_API_KEY", "")
+    gnews_api_key: str = os.getenv("GNEWS_API_KEY", "")
+    mediastack_api_key: str = os.getenv("MEDIASTACK_API_KEY", "")
     
     class Config:
         env_file = ".env"

@@ -494,12 +494,12 @@ const Dashboard: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-[#020617] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
             <button onClick={() => setShowExportModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
-            <div className="p-6 border-b border-slate-800/50">
+            <div className="p-4 md:p-6 border-b border-slate-800/50">
               <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center">
                 <BarChart3 size={20} className="mr-2 text-sky-500" /> Export Analysis
               </h3>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Format</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -544,13 +544,14 @@ const Dashboard: React.FC = () => {
       {showVerifyModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-[#020617] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative flex flex-col max-h-[80vh]">
-            <button onClick={() => setShowVerifyModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
-            <div className="p-6 border-b border-slate-800/50 shrink-0">
+            <button onClick={() => setShowVerifyModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors z-10"><X size={20} /></button>
+            <div className="p-4 md:p-6 border-b border-slate-800/50 shrink-0">
               <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center">
-                <HelpCircle size={20} className="mr-2 text-emerald-500" /> Source Verification
+                <ShieldCheck size={20} className="mr-2 text-emerald-500" /> Source Verification
               </h3>
+              <p className="text-xs text-slate-500 mt-2">Checking real-time credibility of retrieved intelligence across global databases.</p>
             </div>
-            <div className="p-6 overflow-y-auto custom-scrollbar">
+            <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar">
               {verifying ? (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                   <RefreshCw size={32} className="animate-spin text-emerald-500" />
@@ -608,12 +609,12 @@ const Dashboard: React.FC = () => {
             >
               <X size={20} />
             </button>
-            <div className="p-6 border-b border-slate-800/50">
+            <div className="p-4 md:p-6 border-b border-slate-800/50">
               <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center">
                 <Coffee size={20} className="mr-2 text-emerald-500" /> Morning Briefing
               </h3>
             </div>
-            <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="p-4 md:p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
               {digestLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                   <RefreshCw size={24} className="text-emerald-500 animate-spin" />
@@ -633,7 +634,7 @@ const Dashboard: React.FC = () => {
       {showMobileMenu && (
         <div className="fixed inset-0 z-[110] lg:hidden animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setShowMobileMenu(false)}></div>
-          <div className="absolute inset-y-0 left-0 w-80 bg-[#020617] border-r border-slate-800 p-6 space-y-8 animate-in slide-in-from-left duration-300">
+          <div className="absolute inset-y-0 left-0 w-72 sm:w-80 bg-[#020617] border-r border-slate-800 p-4 sm:p-6 space-y-8 animate-in slide-in-from-left duration-300">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">Command Center</h3>
               <button onClick={() => setShowMobileMenu(false)} className="text-slate-500 hover:text-white">
@@ -969,8 +970,8 @@ const Dashboard: React.FC = () => {
 
                 {/* INSIGHT SECTION */}
                 {queryResult && (
-                  <div className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center space-x-2 mb-4">
+                  <div className="mb-8 p-4 md:p-6 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center space-x-3 mb-4">
                       <div className="p-1.5 bg-indigo-500/20 rounded-lg">
                         <Zap size={18} className="text-indigo-400" />
                       </div>
@@ -1030,7 +1031,7 @@ const Dashboard: React.FC = () => {
                     filteredEvidenceItems.map((item: any, idx: number) => {
                       const itemTrust = resolveTrustLevel(item.source, item.trust_level);
                       return (
-                      <div key={idx} className="glass p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group">
+                      <div key={idx} className="glass p-4 md:p-6 rounded-2xl border-slate-800/60 hover:border-sky-500/30 transition-all group active:scale-[0.98]">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center space-x-3">
                             <div className="p-2 bg-slate-900 rounded-lg text-sky-500 group-hover:text-sky-400 transition-colors">

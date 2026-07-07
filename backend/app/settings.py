@@ -39,15 +39,13 @@ class Settings(BaseSettings):
     hackernews_enabled: bool = os.getenv("HACKERNEWS_ENABLED", "True").lower() == "true"
 
     # External news providers (free APIs)
-    newsdata_api_key: str = os.getenv("NEWSDATA_API_KEY", "")
     newsapi_api_key: str = os.getenv("NEWSAPI_API_KEY", "")
-    gnews_api_key: str = os.getenv("GNEWS_API_KEY", "")
-    mediastack_api_key: str = os.getenv("MEDIASTACK_API_KEY", "")
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
     @property
     def resolved_data_path(self) -> Path:

@@ -13,11 +13,7 @@ from ..utils import deduplicate_and_append, get_current_timestamp, extract_compa
 
 logger = logging.getLogger(__name__)
 
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "")
 NEWSAPI_API_KEY = os.getenv("NEWSAPI_API_KEY", "")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
-MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY", "")
-
 TIMEOUT_SECONDS = 3
 CACHE_TTL_SECONDS = 45
 
@@ -91,31 +87,6 @@ def _normalize(article: dict) -> dict:
 # Individual API fetchers
 # ---------------------------------------------------------------------------
 
-async def fetch_newsdata(query: str) -> list[dict]:
-    if not NEWSDATA_API_KEY:
-        return []
-    url = "https://newsdata.io/api/1/news"
-    params = {"apikey": NEWSDATA_API_KEY, "q": query, "language": "en", "size": 10}
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            results = []
-            for item in data.get("results", []):
-                results.append(_normalize({
-                    "timestamp": item.get("pubDate") or _now_iso(),
-                    "source": "NewsData.io",
-                    "title": item.get("title") or "",
-                    "snippet": item.get("description") or item.get("content") or "",
-                    "url": item.get("link") or "",
-                }))
-            return results
-    except Exception as exc:
-        logger.warning(f"NewsData.io fetch failed for '{query}': {exc}")
-        return []
-
-
 async def fetch_newsapi(query: str) -> list[dict]:
     if not NEWSAPI_API_KEY:
         return []
@@ -141,55 +112,6 @@ async def fetch_newsapi(query: str) -> list[dict]:
         return []
 
 
-async def fetch_gnews(query: str) -> list[dict]:
-    if not GNEWS_API_KEY:
-        return []
-    url = "https://gnews.io/api/v4/search"
-    params = {"token": GNEWS_API_KEY, "q": query, "lang": "en", "max": 10}
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            results = []
-            for item in data.get("articles", []):
-                results.append(_normalize({
-                    "timestamp": item.get("publishedAt") or _now_iso(),
-                    "source": "GNews",
-                    "title": item.get("title") or "",
-                    "snippet": item.get("description") or "",
-                    "url": item.get("url") or "",
-                }))
-            return results
-    except Exception as exc:
-        logger.warning(f"GNews fetch failed for '{query}': {exc}")
-        return []
-
-
-async def fetch_mediastack(query: str) -> list[dict]:
-    if not MEDIASTACK_API_KEY:
-        return []
-    url = "https://api.mediastack.com/v1/news"
-    params = {"access_key": MEDIASTACK_API_KEY, "keywords": query, "languages": "en", "limit": 10}
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            results = []
-            for item in data.get("data", []):
-                results.append(_normalize({
-                    "timestamp": item.get("published_at") or _now_iso(),
-                    "source": "Mediastack",
-                    "title": item.get("title") or "",
-                    "snippet": item.get("description") or "",
-                    "url": item.get("url") or "",
-                }))
-            return results
-    except Exception as exc:
-        logger.warning(f"Mediastack fetch failed for '{query}': {exc}")
-        return []
-
 
 # ---------------------------------------------------------------------------
 # Aggregator
@@ -197,10 +119,7 @@ async def fetch_mediastack(query: str) -> list[dict]:
 
 async def fetch_all_sources(query: str) -> list[dict]:
     results = await asyncio.gather(
-        fetch_newsdata(query),
         fetch_newsapi(query),
-        fetch_gnews(query),
-        fetch_mediastack(query),
         return_exceptions=True,
     )
 
@@ -276,43 +195,11 @@ def ingest_news_stream_sync() -> dict[str, int]:
 # Individual pull helpers (for manual trigger endpoints)
 # ---------------------------------------------------------------------------
 
-async def async_pull_newsdata() -> int:
-    all_articles = []
-    for q in SIGNAL_QUERIES[:2]:
-        all_articles.extend(await fetch_newsdata(q))
-    return deduplicate_and_append(all_articles, settings.resolved_data_path)
-
-
 async def async_pull_newsapi() -> int:
     all_articles = []
     for q in SIGNAL_QUERIES[:2]:
         all_articles.extend(await fetch_newsapi(q))
     return deduplicate_and_append(all_articles, settings.resolved_data_path)
-
-
-async def async_pull_gnews() -> int:
-    all_articles = []
-    for q in SIGNAL_QUERIES[:2]:
-        all_articles.extend(await fetch_gnews(q))
-    return deduplicate_and_append(all_articles, settings.resolved_data_path)
-
-
-async def async_pull_mediastack() -> int:
-    all_articles = []
-    for q in SIGNAL_QUERIES[:2]:
-        all_articles.extend(await fetch_mediastack(q))
-    return deduplicate_and_append(all_articles, settings.resolved_data_path)
-
-
-def pull_newsdata() -> int:
-    try:
-        return asyncio.run(async_pull_newsdata())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(async_pull_newsdata())
-        finally:
-            loop.close()
 
 
 def pull_newsapi() -> int:
@@ -325,24 +212,3 @@ def pull_newsapi() -> int:
         finally:
             loop.close()
 
-
-def pull_gnews() -> int:
-    try:
-        return asyncio.run(async_pull_gnews())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(async_pull_gnews())
-        finally:
-            loop.close()
-
-
-def pull_mediastack() -> int:
-    try:
-        return asyncio.run(async_pull_mediastack())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(async_pull_mediastack())
-        finally:
-            loop.close()

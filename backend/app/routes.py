@@ -14,7 +14,7 @@ from .settings import settings
 from .sources.gdelt_source import pull_gdelt_signals
 from .sources.hackernews_source import pull_hn_signals
 from .services.news_sources import (
-    async_pull_newsdata, async_pull_newsapi, async_pull_gnews, async_pull_mediastack,
+    async_pull_newsapi,
     ingest_news_stream,
 )
 from .utils import (
@@ -634,39 +634,12 @@ async def list_llm_models():
 
 
 # Source endpoints
-@router.post("/sources/newsdata/pull")
-async def pull_newsdata_endpoint():
-    """Trigger NewsData.io signal pull"""
-    try:
-        count = await async_pull_newsdata()
-        return {"status": "ok", "source": "NewsData.io", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/sources/newsapi/pull")
 async def pull_newsapi_endpoint():
     """Trigger NewsAPI signal pull"""
     try:
         count = await async_pull_newsapi()
         return {"status": "ok", "source": "NewsAPI", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/sources/gnews/pull")
-async def pull_gnews_endpoint():
-    """Trigger GNews signal pull"""
-    try:
-        count = await async_pull_gnews()
-        return {"status": "ok", "source": "GNews", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/sources/mediastack/pull")
-async def pull_mediastack_endpoint():
-    """Trigger Mediastack signal pull"""
-    try:
-        count = await async_pull_mediastack()
-        return {"status": "ok", "source": "Mediastack", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

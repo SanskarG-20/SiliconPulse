@@ -17,6 +17,19 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              vendor: ['react', 'react-dom', 'react-router-dom'],
+              clerk: ['@clerk/clerk-react'],
+              genai: ['@google/genai', 'react-markdown'],
+              swr: ['swr'],
+            },
+          },
+        },
+      },
     };
 });

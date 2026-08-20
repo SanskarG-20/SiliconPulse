@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from ..graph.routes import router as graph_router
 from .auth import router as auth_router
 from .diagnostics import router as diagnostics_router
 from .export import router as export_router
@@ -18,3 +19,4 @@ router.include_router(export_router, prefix="", tags=["export"])
 router.include_router(recommendations_router, prefix="", tags=["recommendations"])
 router.include_router(diagnostics_router, prefix="/user", tags=["diagnostics"])
 router.include_router(llm_router, prefix="/llm", tags=["llm"])
+router.include_router(graph_router, prefix="/graph", tags=["graph"])

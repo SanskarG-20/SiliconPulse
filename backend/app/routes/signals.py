@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core.auth import get_current_user
+from ..core.limiter import limiter
 from ..models import InjectRequest, InjectResponse
 from ..settings import settings
 from ..supabase_client import ensure_user, insert_signal_record
@@ -32,7 +33,8 @@ async def get_signals():
 
 
 @router.post("/inject", response_model=InjectResponse)
-async def inject_signal(request: InjectRequest, user=Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def inject_signal(request: Request, body: InjectRequest, user=Depends(get_current_user)):
     """
     Inject a new data item into the stream.
 
@@ -41,16 +43,16 @@ async def inject_signal(request: InjectRequest, user=Depends(get_current_user)):
     - Appends as JSON line to DATA_STREAM_PATH if unique
     """
     try:
-        if request.timestamp is None:
+        if body.timestamp is None:
             injected_at = datetime.now().isoformat()
         else:
-            injected_at = request.timestamp
+            injected_at = body.timestamp
 
         data_entry = {
-            "title": request.title,
-            "content": request.content,
+            "title": body.title,
+            "content": body.content,
             "timestamp": injected_at,
-            "source": request.source
+            "source": body.source
         }
 
         data_path = settings.resolved_data_path
@@ -68,9 +70,9 @@ async def inject_signal(request: InjectRequest, user=Depends(get_current_user)):
             ensure_user(user_id, user_email)
             insert_signal_record(
                 user_id=user_id,
-                source=request.source,
-                title=request.title,
-                content=request.content,
+                source=body.source,
+                title=body.title,
+                content=body.content,
                 timestamp=injected_at,
             )
 

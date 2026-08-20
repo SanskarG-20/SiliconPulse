@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 class QueryRequest(BaseModel):
     """Request model for querying SiliconPulse intelligence"""
-    query: str = Field(..., description="The query string to search for")
-    k: int = Field(default=5, description="Number of top results to return")
+    query: str = Field(..., min_length=1, max_length=500, description="The query string to search for")
+    k: int = Field(default=5, ge=1, le=20, description="Number of top results to return (1-20)")
 
 
 class EvidenceItem(BaseModel):
@@ -41,10 +41,10 @@ class QueryResponse(BaseModel):
 
 class InjectRequest(BaseModel):
     """Request model for manually injecting data into the stream"""
-    title: str = Field(..., description="Title of the injected item")
-    content: str = Field(..., description="Content of the injected item")
+    title: str = Field(..., min_length=1, max_length=200, description="Title of the injected item (1-200 chars)")
+    content: str = Field(..., min_length=1, max_length=5000, description="Content of the injected item (1-5000 chars)")
     timestamp: Optional[str] = Field(None, description="Timestamp of the event")
-    source: str = Field(default="ManualInject", description="Source identifier")
+    source: str = Field(default="ManualInject", min_length=1, max_length=50, description="Source identifier (1-50 chars)")
 
 
 class InjectResponse(BaseModel):
@@ -72,8 +72,8 @@ class RadarStatus(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Request model for generating insights with Gemini"""
-    query: str = Field(..., description="The user query")
-    context: str = Field(..., description="The formatted context string")
+    query: str = Field(..., min_length=1, max_length=500, description="The user query (1-500 chars)")
+    context: str = Field(..., max_length=10000, description="The formatted context string (max 10k chars)")
 
 
 class GenerateResponse(BaseModel):
@@ -83,10 +83,10 @@ class GenerateResponse(BaseModel):
 
 class ExportRequest(BaseModel):
     """Request model for exporting analysis"""
-    query: str = Field(..., description="The original query")
-    report: str = Field(..., description="The generated report content")
-    evidence: list[EvidenceItem] = Field(..., description="List of evidence items")
-    format: str = Field(..., description="Export format: md, json, txt, pdf")
+    query: str = Field(..., min_length=1, max_length=500, description="The original query")
+    report: str = Field(..., min_length=1, max_length=50000, description="The generated report content")
+    evidence: list[EvidenceItem] = Field(..., max_length=50, description="List of evidence items (max 50)")
+    format: str = Field(..., pattern="^(md|json|txt|pdf)$", description="Export format: md, json, txt, pdf")
     include_evidence: bool = Field(default=True, description="Whether to include evidence in the export")
 
 

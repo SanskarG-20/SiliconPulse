@@ -4,10 +4,11 @@ import time
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
+from ..core.limiter import limiter
 from ..models import (
     EvidenceItem,
     GenerateRequest,
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest, user=Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def process_query(request: Request, body: QueryRequest, user=Depends(get_current_user)):
     """
     Process a query and retrieve top-k evidence from the data stream.
 
@@ -43,27 +45,27 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
     user_email = user.get("email")
 
     try:
-        cached_result = query_cache.get(request.query, request.k)
+        cached_result = query_cache.get(body.query, body.k)
         if cached_result:
             if user_id:
                 ensure_user(user_id, user_email)
                 insert_query_record(
                     user_id=user_id,
-                    query_text=request.query,
-                    k=request.k,
+                    query_text=body.query,
+                    k=body.k,
                     evidence_count=len(cached_result.get("evidence", [])),
                     signal_strength=cached_result.get("signal_strength", 0),
                 )
-            logger.info(f"[{request_id}] Cache HIT - {request.query[:50]} - {(time.time() - start_time)*1000:.1f}ms")
+            logger.info(f"[{request_id}] Cache HIT - {body.query[:50]} - {(time.time() - start_time)*1000:.1f}ms")
             return QueryResponse(**cached_result)
 
-        logger.info(f"[{request_id}] Query START - {request.query[:50]}")
+        logger.info(f"[{request_id}] Query START - {body.query[:50]}")
 
         data_path = settings.resolved_data_path
 
         if not data_path.exists():
             result = {
-                "query": request.query,
+                "query": body.query,
                 "evidence": [],
                 "signal_strength": 0,
                 "last_updated": datetime.now().isoformat()
@@ -72,12 +74,12 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
                 ensure_user(user_id, user_email)
                 insert_query_record(
                     user_id=user_id,
-                    query_text=request.query,
-                    k=request.k,
+                    query_text=body.query,
+                    k=body.k,
                     evidence_count=0,
                     signal_strength=0,
                 )
-            query_cache.set(request.query, request.k, result)
+            query_cache.set(body.query, body.k, result)
             return QueryResponse(**result)
 
         events = safe_read_jsonl(
@@ -88,7 +90,7 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
 
         matched_events = []
 
-        raw_keywords = [kw.lower() for kw in request.query.split() if len(kw) > 2]
+        raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
         query_keywords = set(raw_keywords)
 
         for company, data in COMPANY_DICT.items():
@@ -151,10 +153,10 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
             ))
 
         evidence_list.sort(key=lambda x: x.timestamp, reverse=True)
-        evidence_list = evidence_list[:request.k]
+        evidence_list = evidence_list[:body.k]
 
         result = {
-            "query": request.query,
+            "query": body.query,
             "evidence": evidence_list,
             "signal_strength": compute_confidence(evidence_list)["score"],
             "confidence": compute_confidence(evidence_list),
@@ -164,14 +166,14 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
             "stream_path_used": str(data_path)
         }
 
-        query_cache.set(request.query, request.k, result)
+        query_cache.set(body.query, body.k, result)
 
         if user_id:
             ensure_user(user_id, user_email)
             insert_query_record(
                 user_id=user_id,
-                query_text=request.query,
-                k=request.k,
+                query_text=body.query,
+                k=body.k,
                 evidence_count=len(evidence_list),
                 signal_strength=result["signal_strength"],
             )
@@ -182,7 +184,7 @@ async def process_query(request: QueryRequest, user=Depends(get_current_user)):
     except Exception as e:
         print(f"Query Error: {e}")
         return QueryResponse(
-            query=request.query,
+            query=body.query,
             evidence=[],
             signal_strength=0,
             confidence=compute_confidence([]),
@@ -236,7 +238,8 @@ async def get_radar():
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate_insight(request: GenerateRequest, user=Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def generate_insight(request: Request, body: GenerateRequest, user=Depends(get_current_user)):
     """Generate insight using Gemini based on query and context."""
     try:
         user_id = user.get("user_id")
@@ -248,16 +251,16 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
                 ensure_user(user_id, user_email)
                 insert_insight_record(
                     user_id=user_id,
-                    query_text=request.query,
+                    query_text=body.query,
                     insight=fallback_text,
                     model_name=settings.gemini_model,
                     status="simulated",
                 )
             return GenerateResponse(insight=fallback_text)
 
-        evidence_count = request.context.count("[20")
+        evidence_count = body.context.count("[20")
 
-        logger.info(f"Generating insight for query: '{request.query}' | Evidence Count: {evidence_count} | Context Len: {len(request.context)}")
+        logger.info(f"Generating insight for query: '{body.query}' | Evidence Count: {evidence_count} | Context Len: {len(body.context)}")
 
         if evidence_count == 0:
             logger.info("Zero evidence found. Generating structured fallback.")
@@ -267,7 +270,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
 
             from ..company_dict import COMPANY_DICT
             suggestions = []
-            query_upper = request.query.upper()
+            query_upper = body.query.upper()
 
             matched_company = None
             for company, data in COMPANY_DICT.items():
@@ -286,7 +289,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
                         "id": "evidence",
                         "title": "Insufficient Live Signals",
                         "points": [
-                            f"No direct evidence found for '{request.query}' in the current data stream.",
+                            f"No direct evidence found for '{body.query}' in the current data stream.",
                             "The system is actively monitoring global nodes for relevant signals."
                         ]
                     },
@@ -318,7 +321,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
                 ensure_user(user_id, user_email)
                 insert_insight_record(
                     user_id=user_id,
-                    query_text=request.query,
+                    query_text=body.query,
                     insight=fallback_json,
                     model_name=settings.gemini_model,
                     status="fallback",
@@ -329,10 +332,10 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
         You are SiliconPulse, an advanced strategic intelligence engine. 
         Generate a high-precision intelligence report based on the provided context.
         
-        QUERY: {request.query}
+        QUERY: {body.query}
         
         CONTEXT:
-        {request.context}
+        {body.context}
         
         INSTRUCTIONS:
         - Analyze the provided evidence carefully.
@@ -376,7 +379,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
             ensure_user(user_id, user_email)
             insert_insight_record(
                 user_id=user_id,
-                query_text=request.query,
+                query_text=body.query,
                 insight=insight_text,
                 model_name=settings.gemini_model,
                 status="success",
@@ -393,7 +396,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
             ensure_user(user_id, user_email)
             insert_insight_record(
                 user_id=user_id,
-                query_text=request.query,
+                query_text=body.query,
                 insight=failed_text,
                 model_name=settings.gemini_model,
                 status="failed",

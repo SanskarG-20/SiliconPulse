@@ -1,7 +1,9 @@
 import asyncio
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from ..core.limiter import limiter
 
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
@@ -16,7 +18,8 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.post("/newsapi/pull")
-async def pull_newsapi_endpoint():
+@limiter.limit("5/minute")
+async def pull_newsapi_endpoint(request: Request):
     """Trigger NewsAPI signal pull"""
     try:
         count = await async_pull_newsapi()
@@ -26,7 +29,8 @@ async def pull_newsapi_endpoint():
 
 
 @router.post("/pull_all")
-async def pull_all_sources():
+@limiter.limit("5/minute")
+async def pull_all_sources(request: Request):
     """Trigger all signal sources (News APIs + GDELT + HackerNews)"""
     try:
         news_result, gdelt_count, hn_count = await asyncio.gather(

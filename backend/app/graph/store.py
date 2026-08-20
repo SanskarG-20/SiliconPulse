@@ -117,3 +117,35 @@ def get_suppliers(company: str, depth: int = 2) -> dict:
                 queue.append((src, new_path, new_score, d + 1))
     result.pop(canonical, None)
     return result
+
+
+def simulate_scenario(company: str, shock: float, depth: int = 2) -> dict:
+    """
+    Simulate a shock at `company` (e.g. yield -0.1 = -10%).
+    `shock` in (-0.9, 0.9): -0.1 = -10% capacity/yield.
+    Returns downstream impact with original vs shocked scores and delta.
+    Shocked score = original_score * (1 + shock)  (linear propagation).
+    """
+    base = get_impact(company, depth=depth)
+    if not base:
+        return {}
+    factor = 1.0 + shock
+    # Clamp factor to avoid negative
+    factor = max(0.05, factor)
+    result: dict[str, dict] = {}
+    for node, info in base.items():
+        orig = info["score"]
+        shocked = round(orig * factor, 3)
+        delta = round(shocked - orig, 3)
+        # Simple USD estimate: assume $1B baseline per 0.1 score (illustrative)
+        est_usd_m = int(abs(delta) * 10000)  # e.g. delta -0.095 -> 950M
+        result[node] = {
+            "distance": info["distance"],
+            "path": info["path"],
+            "original_score": orig,
+            "shocked_score": shocked,
+            "delta": delta,
+            "est_impact_usd_m": est_usd_m,
+            "severity": "High" if abs(delta) > 0.15 else "Medium" if abs(delta) > 0.07 else "Low",
+        }
+    return result

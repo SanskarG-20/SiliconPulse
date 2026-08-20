@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from ..core.auth import get_current_user
-from .store import get_edges, get_impact, get_nodes, get_suppliers
+from ..core.limiter import limiter
+from ..settings import settings
+from ..utils import safe_read_jsonl
+from .store import get_edges, get_impact, get_nodes, get_suppliers, simulate_scenario
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -75,3 +79,94 @@ async def graph_explain(company: str, depth: int = Query(default=2, ge=1, le=3))
     else:
         lines.append("Downstream impact: none")
     return {"company": company, "depth": depth, "context": "\n".join(lines), "impact": impact, "suppliers": suppliers}
+
+
+class SimulateRequest(BaseModel):
+    company: str = Field(..., min_length=1, max_length=50, description="Company to shock")
+    shock: float = Field(..., ge=-0.9, le=0.9, description="Shock factor: -0.1 = -10% yield/capacity")
+    depth: int = Field(default=2, ge=1, le=3, description="BFS depth")
+    metric: str = Field(default="yield", description="Metric shocked (yield, capacity, supply)")
+
+
+@router.post("/simulate")
+@limiter.limit("15/minute")
+async def graph_simulate(request: Request, body: SimulateRequest, user=Depends(get_current_user)):
+    """
+    Simulate a supply-chain shock and generate an LLM scenario report.
+    Shock -0.1 = TSMC N2 yield -10% → downstream NVIDIA, Microsoft etc. are scored as shocked_score = original * (1+shock).
+    """
+
+    # Validate company exists
+    if body.company.lower() not in [n.lower() for n in get_nodes()]:
+        raise HTTPException(status_code=404, detail=f"Company '{body.company}' not in graph")
+
+    # Get shocked impact
+    shocked = simulate_scenario(body.company, body.shock, depth=body.depth)
+    # Build human-readable impact lines
+    impact_lines = []
+    for target, info in list(shocked.items())[:6]:
+        impact_lines.append(
+            f"{target}: {info['original_score']} → {info['shocked_score']} (Δ {info['delta']}, {info['severity']}, est ${info['est_impact_usd_m']}M)"
+        )
+    impact_text = "\n".join(impact_lines) if impact_lines else "No downstream impact"
+
+    # Try to generate LLM scenario report (graceful fallback if no key)
+    scenario_report = None
+    if settings.gemini_api_key:
+        try:
+            from ..services.gemini_client import gemini_client
+
+            shock_pct = int(body.shock * 100)
+            prompt = f"""
+You are SiliconPulse Scenario Engine. Simulate a supply-chain shock.
+
+COMPANY: {body.company}
+SHOCK: {shock_pct}% change in {body.metric} (factor {1+body.shock:.2f})
+DEPTH: {body.depth}
+
+GRAPH IMPACT (shocked):
+{impact_text}
+
+INSTRUCTIONS:
+- Output valid JSON with sections: evidence, change, impact, competitors, outlook, confidence, ceo
+- Quantify downstream $M impact using est_impact_usd_m
+- Suggest mitigations (dual-source, inventory, alternative fab)
+- Keep confidence Medium/Low due to simulation uncertainty
+JSON SCHEMA: {{"sections": [{{"id":"evidence","title":"Shock Evidence","points":[...]}}]}}
+"""
+            scenario_report = await gemini_client.generate_content_with_fallback(prompt)
+            # Ensure valid JSON string
+            import json
+
+            try:
+                json.loads(scenario_report)
+            except Exception:
+                pass
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).warning(f"Scenario LLM failed: {e}")
+
+    # Serialize shocked (Edge objects)
+    serial_shocked = {}
+    for k, v in shocked.items():
+        serial_shocked[k] = {
+            "distance": v["distance"],
+            "original_score": v["original_score"],
+            "shocked_score": v["shocked_score"],
+            "delta": v["delta"],
+            "est_impact_usd_m": v["est_impact_usd_m"],
+            "severity": v["severity"],
+            "path": [e.__dict__ for e in v["path"]],
+        }
+
+    return {
+        "company": body.company,
+        "shock": body.shock,
+        "metric": body.metric,
+        "depth": body.depth,
+        "factor": round(1 + body.shock, 3),
+        "impact": serial_shocked,
+        "impact_text": impact_text,
+        "scenario_report": scenario_report,
+    }

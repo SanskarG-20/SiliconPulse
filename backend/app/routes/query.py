@@ -17,11 +17,12 @@ from ..models import (
     QueryResponse,
     RadarStatus,
 )
+from ..graph.store import get_impact, get_suppliers
 from ..query_cache import query_cache
 from ..services.gemini_client import gemini_client
 from ..settings import settings
 from ..supabase_client import ensure_user, insert_insight_record, insert_query_record
-from ..utils import compute_confidence, safe_read_jsonl
+from ..utils import compute_confidence, extract_companies, safe_read_jsonl
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
@@ -328,14 +329,34 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
                 )
             return GenerateResponse(insight=fallback_json)
 
+        # Graph RAG enrichment
+        graph_parts = []
+        try:
+            companies_in_query = extract_companies(body.query)
+            for comp in companies_in_query[:2]:
+                impact = get_impact(comp, depth=2)
+                suppliers = get_suppliers(comp, depth=2)
+                if impact:
+                    downstream = ", ".join([f"{k} (score {v['score']}, via {v['path'][0].relation})" for k, v in list(impact.items())[:4]])
+                    graph_parts.append(f"DOWNSTREAM IMPACT of {comp}: {downstream}")
+                if suppliers:
+                    upstream = ", ".join([f"{k} (score {v['score']})" for k, v in list(suppliers.items())[:4]])
+                    graph_parts.append(f"UPSTREAM SUPPLIERS of {comp}: {upstream}")
+        except Exception as ge:
+            logger.warning(f"Graph enrichment failed: {ge}")
+        graph_context = "\n".join(graph_parts) if graph_parts else "No supply-chain graph data for query."
+
         prompt = f"""
-        You are SiliconPulse, an advanced strategic intelligence engine.
+        You are SiliconPulse, an advanced strategic intelligence engine. 
         Generate a high-precision intelligence report based on the provided context.
-
+        
         QUERY: {body.query}
-
+        
         CONTEXT:
         {body.context}
+
+        GRAPH CONTEXT (supply-chain relationships):
+        {graph_context}
 
         INSTRUCTIONS:
         - Analyze the provided evidence carefully.

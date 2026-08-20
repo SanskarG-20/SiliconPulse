@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +19,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    logger.info("Starting up SiliconPulse API...")
+    logger.info(f"Using DATA_STREAM_PATH={settings.resolved_data_path}")
+    init_db()
+    logger.info("Database initialized")
+    start_scheduler()
+    logger.info("Real-time data scheduler started")
+    yield
+    # shutdown
+    logger.info("Shutting down SiliconPulse API...")
+    stop_scheduler()
+    logger.info("Scheduler stopped")
+
+
 app = FastAPI(
     title=settings.app_name,
     description="Strategic Intelligence Backend",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -62,21 +81,6 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": now_ts()
         }
     )
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting up SiliconPulse API...")
-    logger.info(f"Using DATA_STREAM_PATH={settings.resolved_data_path}")
-    init_db()
-    logger.info("Database initialized")
-    start_scheduler()
-    logger.info("Real-time data scheduler started")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Shutting down SiliconPulse API...")
-    stop_scheduler()
-    logger.info("Scheduler stopped")
 
 # Include API routes with /api prefix
 app.include_router(router, prefix="/api", tags=["api"])

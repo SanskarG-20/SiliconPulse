@@ -66,8 +66,22 @@ graph TD
 ### Prerequisites
 - **Python 3.11+**
 - **Node.js 18+**
-- **Google Gemini API Key** (Set as `GEMINI_API_KEY` in `backend/.env`)
-- API Keys for News sources (NewsData.io, NewsAPI, GNews, Mediastack) - *Optional but recommended for live streams.*
+- **Google Gemini API Key** (Get from [Google AI Studio](https://aistudio.google.com/apikey))
+- **Clerk Account** for authentication (Get from [Clerk Dashboard](https://dashboard.clerk.com))
+- **Supabase Project** for data persistence (Get from [Supabase](https://supabase.com))
+- API Keys for News sources (NewsAPI.org) - *Optional but recommended for live streams.*
+
+> ⚠️ **WINDOWS USERS - IMPORTANT LIMITATION**
+> 
+> **Pathway (the streaming engine) does NOT run natively on Windows.** It requires Linux, WSL2, or macOS.
+> 
+> **On Windows, the system works in "Polling Mode":**
+> - The Pathway pipeline is disabled (`USE_PATHWAY=False` in `.env`)
+> - A background scheduler pulls from NewsAPI, GDELT, and HackerNews every 5 minutes
+> - Deduplication still works via SQLite checkpoints
+> - For true streaming deduplication, run the backend in **WSL2** or deploy to Linux (Fly.io, Render, Railway)
+> 
+> See [`.env.example`](.env.example) for all configuration options.
 
 ### Installation & Setup
 
@@ -77,15 +91,24 @@ graph TD
    cd SiliconPulse
    ```
 
-2. **Backend Setup**
+2. **Configure Environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys (required: GEMINI_API_KEY, CLERK_ISSUER, CLERK_AUDIENCE, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+   ```
+
+3. **Backend Setup**
    ```bash
    cd backend
    python -m venv venv
-   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+   # Windows:
+   .\venv\Scripts\activate
+   # Linux/Mac:
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. **Frontend Setup**
+4. **Frontend Setup**
    ```bash
    cd frontend
    npm install
@@ -93,28 +116,37 @@ graph TD
 
 ### Running the System
 
-SiliconPulse requires three services to run concurrently for full functionality.
+SiliconPulse requires **two services** on Windows (three on Linux/WSL) to run concurrently.
 
-**Terminal 1: Data Pipeline (Pathway)**
+#### Windows (Default - Polling Mode)
 ```bash
+# Terminal 1: API Server (includes background scheduler for data pulls)
 cd backend
-python pathway_pipeline.py
-```
+.\run_backend.ps1
+# OR manually: uvicorn app.main:app --reload --port 8000
 
-**Terminal 2: API Server (FastAPI)**
-```bash
-cd backend
-uvicorn app.main:app --reload --port 8000
-```
-
-**Terminal 3: UI Dashboard (React)**
-```bash
+# Terminal 2: UI Dashboard (React)
 cd frontend
 npm run dev
 ```
 Navigate to `http://localhost:5173` to access the Command Center.
 
-> **Windows Users**: We provide one-click powershell scripts in the respective directories (`run_pathway.ps1`, `run_backend.ps1`, `run_frontend.ps1`) for convenience.
+#### Linux / WSL2 (Full Streaming Mode)
+```bash
+# Terminal 1: Data Pipeline (Pathway - true streaming)
+cd backend
+python pathway_pipeline.py
+
+# Terminal 2: API Server (FastAPI)
+cd backend
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 3: UI Dashboard (React)
+cd frontend
+npm run dev
+```
+
+> **Note**: On Windows, set `USE_PATHWAY=False` in `.env` (default). The scheduler handles data ingestion every 5 minutes. On Linux/WSL, set `USE_PATHWAY=True` for real-time streaming.
 
 ---
 

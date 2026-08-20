@@ -1,15 +1,17 @@
-import os
-import json
-import hashlib
 import asyncio
+import hashlib
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+import os
+from datetime import datetime
 
 import httpx
 
 from ..settings import settings
-from ..utils import deduplicate_and_append, get_current_timestamp, extract_companies, classify_event_type
+from ..utils import (
+    classify_event_type,
+    deduplicate_and_append,
+    extract_companies,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ SIGNAL_QUERIES = [
 ]
 
 
-def _map_company(text: str) -> Optional[str]:
+def _map_company(text: str) -> str | None:
     """Dynamically extract the primary company name from text using NLP/Regex heuristics."""
     companies = extract_companies(text)
     if companies:

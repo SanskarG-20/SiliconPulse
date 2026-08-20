@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..core.auth import get_current_user
 from ..models import InjectRequest, InjectResponse
 from ..settings import settings
-from ..utils import safe_read_jsonl, deduplicate_and_append
-from .. import storage
-from ..core.auth import get_current_user
 from ..supabase_client import ensure_user, insert_signal_record
+from ..utils import deduplicate_and_append, safe_read_jsonl
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

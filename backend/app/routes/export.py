@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Response, HTTPException
-from datetime import datetime
 import json
+from datetime import datetime
 
-from ..models import ExportRequest, EvidenceItem
+from fastapi import APIRouter, Depends, HTTPException, Response
+
 from ..core.auth import get_current_user
+from ..models import ExportRequest
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -20,13 +21,13 @@ async def export_analysis(request: ExportRequest):
         if request.format == "md":
             filename += ".md"
             media_type = "text/markdown"
-            content = f"# SiliconPulse Intelligence Report\n\n"
+            content = "# SiliconPulse Intelligence Report\n\n"
             content += f"**Query:** {request.query}\n"
             content += f"**Date:** {datetime.now().isoformat()}\n\n"
             content += f"## Strategic Insight\n\n{request.report}\n\n"
 
             if request.include_evidence:
-                content += f"## Evidence\n\n"
+                content += "## Evidence\n\n"
                 for item in request.evidence:
                     content += f"- **{item.title}** ({item.source})\n"
                     content += f"  - {item.snippet}\n"
@@ -49,17 +50,17 @@ async def export_analysis(request: ExportRequest):
         elif request.format == "txt":
             filename += ".txt"
             media_type = "text/plain"
-            content = f"SILICONPULSE INTELLIGENCE REPORT\n"
-            content += f"==============================\n"
+            content = "SILICONPULSE INTELLIGENCE REPORT\n"
+            content += "==============================\n"
             content += f"Query: {request.query}\n"
             content += f"Date: {datetime.now().isoformat()}\n\n"
-            content += f"STRATEGIC INSIGHT\n"
-            content += f"-----------------\n"
+            content += "STRATEGIC INSIGHT\n"
+            content += "-----------------\n"
             content += f"{request.report}\n\n"
 
             if request.include_evidence:
-                content += f"EVIDENCE\n"
-                content += f"--------\n"
+                content += "EVIDENCE\n"
+                content += "--------\n"
                 for item in request.evidence:
                     content += f"* {item.title} ({item.source})\n"
                     content += f"  {item.snippet}\n"

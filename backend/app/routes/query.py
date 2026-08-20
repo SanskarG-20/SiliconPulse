@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Depends
-from datetime import datetime
-import time
-import uuid
 import json
 import logging
+import time
+import uuid
+from datetime import datetime
 
-from ..models import QueryRequest, QueryResponse, GenerateRequest, GenerateResponse, RadarStatus, EvidenceItem
-from ..settings import settings
-from ..utils import safe_read_jsonl, compute_confidence
-from ..services.gemini_client import gemini_client
-from ..cache import event_cache
-from ..query_cache import query_cache
+from fastapi import APIRouter, Depends
+
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
-from ..supabase_client import ensure_user, insert_query_record, insert_insight_record
+from ..models import (
+    EvidenceItem,
+    GenerateRequest,
+    GenerateResponse,
+    QueryRequest,
+    QueryResponse,
+    RadarStatus,
+)
+from ..query_cache import query_cache
+from ..services.gemini_client import gemini_client
+from ..settings import settings
+from ..supabase_client import ensure_user, insert_insight_record, insert_query_record
+from ..utils import compute_confidence, safe_read_jsonl
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)

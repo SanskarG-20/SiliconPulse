@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from ..services.gemini_client import gemini_client
 from ..core.auth import get_current_user
+from ..services.gemini_client import gemini_client
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

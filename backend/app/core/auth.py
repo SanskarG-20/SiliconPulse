@@ -1,4 +1,5 @@
 import logging
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -69,7 +70,7 @@ def get_current_user(
     elif "email_verified" in payload:
         # Some Clerk tokens have email_verified but not email; fetch contextually
         email = payload.get("email")
-    
+
     # Additional fallback: check primary_email_address_id and related claims
     if not email and "primary_email_address_id" in payload:
         # This is just metadata; actual email is typically in "email" claim

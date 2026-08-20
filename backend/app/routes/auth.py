@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
-from ..core.auth import get_current_user
-from ..supabase_client import ensure_user
-from ..demo_generator import DemoGenerator
-from ..utils import deduplicate_and_append
-from ..settings import settings
-from ..cache import event_cache
 import logging
+
+from fastapi import APIRouter, Depends
+
+from ..cache import event_cache
+from ..core.auth import get_current_user
+from ..demo_generator import DemoGenerator
+from ..settings import settings
+from ..supabase_client import ensure_user
+from ..utils import deduplicate_and_append
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)

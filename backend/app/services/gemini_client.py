@@ -1,8 +1,10 @@
-import google.generativeai as genai
-from app.settings import settings
-import logging
 import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import logging
+
+import google.generativeai as genai
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +28,9 @@ class GeminiClient:
             for m in genai.list_models():
                 if "generateContent" in m.supported_generation_methods:
                     all_models.append(m.name)
-            
+
             logger.info(f"All available Gemini models: {all_models}")
-            
+
             # Priority list
             preferred_order = [
                 "models/gemini-1.5-flash",
@@ -36,23 +38,23 @@ class GeminiClient:
                 "models/gemini-1.0-pro",
                 "models/gemini-pro"
             ]
-            
+
             # 1. Add preferred models if they exist
             self.available_models = []
             for preferred in preferred_order:
                 if preferred in all_models:
                     self.available_models.append(preferred)
-            
+
             # 2. Add any other models not in preferred list (as backup)
             for m in all_models:
                 if m not in self.available_models:
                     self.available_models.append(m)
-            
+
             if not self.available_models:
                 logger.error("No models found supporting generateContent.")
             else:
                 logger.info(f"Gemini models ready for use: {self.available_models}")
-                
+
         except Exception as e:
             logger.error(f"Failed to discover models: {e}")
             # Fallback to settings default
@@ -84,7 +86,7 @@ class GeminiClient:
             return "Insight generation unavailable: No Gemini models found."
 
         errors = []
-        
+
         for model_name in self.available_models:
             try:
                 logger.info(f"Attempting generation with model: {model_name}")
@@ -92,14 +94,14 @@ class GeminiClient:
             except Exception as e:
                 error_str = str(e)
                 logger.warning(f"Model {model_name} failed: {error_str}")
-                
+
                 # Check for Rate Limit (429)
                 if "429" in error_str or "Quota exceeded" in error_str:
                     logger.warning(f"Rate limit hit for {model_name}, trying next model...")
                     errors.append(f"{model_name}: Rate Limit")
                     continue # Try next model
-                
-                # For other errors, we might also want to try next model, 
+
+                # For other errors, we might also want to try next model,
                 # but let's be conservative and try next only if it seems like a model-specific issue
                 errors.append(f"{model_name}: {error_str}")
                 continue
@@ -129,7 +131,7 @@ class GeminiClient:
             "available_models": self.available_models,
             "generation_test": "skipped"
         }
-        
+
         if settings.gemini_api_key and self.available_models:
             try:
                 # Try with first model
@@ -142,7 +144,7 @@ class GeminiClient:
             except Exception as e:
                 status["generation_test"] = "failed"
                 status["error"] = str(e)
-                
+
         return status
 
 gemini_client = GeminiClient()

@@ -1,13 +1,13 @@
 from fastapi import APIRouter
 
 from .auth import router as auth_router
-from .signals import router as signals_router
-from .query import router as query_router
-from .sources import router as sources_router
-from .export import router as export_router
-from .recommendations import router as recommendations_router
 from .diagnostics import router as diagnostics_router
+from .export import router as export_router
 from .llm import router as llm_router
+from .query import router as query_router
+from .recommendations import router as recommendations_router
+from .signals import router as signals_router
+from .sources import router as sources_router
 
 router = APIRouter(dependencies=[])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])

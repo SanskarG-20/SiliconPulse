@@ -1,13 +1,13 @@
 """
 Utility functions for SiliconPulse backend
 """
-from datetime import datetime, timedelta
-from typing import Any, Optional
-import json
 import hashlib
-import re
-from pathlib import Path
+import json
 import logging
+import re
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 # Import storage module (circular import avoidance handled by function calls)
 # We'll import inside functions where needed or rely on caller to pass dependencies if strict separation required
@@ -45,11 +45,11 @@ def extract_companies(text: str) -> list[str]:
     """
     if not text:
         return []
-    
+
     text_lower = text.lower()
     found_canonical = set()
     matched_words = set()  # Track individual words that are part of matched aliases
-    
+
     # 1. First pass: Check COMPANY_DICT aliases (high precision) - longest first
     for alias_lower, canonical in _alias_entries:
         if alias_lower in text_lower:
@@ -65,7 +65,7 @@ def extract_companies(text: str) -> list[str]:
                     matched_words.add(word)
                 found_canonical.add(canonical)
                 start = idx + 1
-    
+
     # 2. Second pass: Regex for unknown companies (broad recall)
     matches = _COMPANY_PATTERN.findall(text)
     for m in matches:
@@ -80,10 +80,10 @@ def extract_companies(text: str) -> list[str]:
                 found_canonical.add(canonical)
             elif m_lower not in {c.lower() for c in found_canonical}:
                 found_canonical.add(m)
-    
+
     return list(found_canonical)
 
-def get_primary_company(text: str) -> Optional[str]:
+def get_primary_company(text: str) -> str | None:
     """Get the first/most relevant company from text, or None."""
     companies = extract_companies(text)
     return companies[0] if companies else None
@@ -149,14 +149,14 @@ def classify_event_type(title: str, content: str = "") -> str:
     """
     if not title and not content:
         return "general"
-    
+
     text = (title + " " + content).lower()
-    
+
     # Check keywords in priority order (more specific first)
     for keyword, event_type in _EVENT_TYPE_KEYWORDS.items():
         if keyword in text:
             return event_type
-    
+
     return "general"
 
 def get_current_timestamp() -> str:
@@ -200,7 +200,7 @@ def compute_event_id(event: dict) -> str:
     """
     title = normalize_text(event.get('title', ''))
     source = normalize_text(event.get('source', ''))
-    
+
     # Prefer URL for uniqueness if available
     url = event.get('url', '')
     if url:
@@ -209,7 +209,7 @@ def compute_event_id(event: dict) -> str:
         # Fallback to content snippet
         content = normalize_text(event.get('content', ''))[:200]
         unique_str = f"{title}|{content}|{source}"
-        
+
     return hashlib.sha256(unique_str.encode()).hexdigest()
 
 def parse_timestamp(ts: Any) -> datetime:
@@ -229,10 +229,10 @@ def is_fresh(timestamp: str, hours: int = 12) -> bool:
     """Check if event is within freshness window"""
     if not timestamp:
         return False
-    
+
     event_time = parse_timestamp(timestamp)
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-    
+
     return event_time > cutoff_time
 
 def compute_recency_boost(timestamp: str, max_boost: int = 50) -> int:
@@ -243,15 +243,15 @@ def compute_recency_boost(timestamp: str, max_boost: int = 50) -> int:
     """
     if not timestamp:
         return 0
-        
+
     event_time = parse_timestamp(timestamp)
     age_hours = (datetime.utcnow() - event_time).total_seconds() / 3600
-    
+
     if age_hours < 0: # Future timestamp
         return max_boost
     if age_hours > 24:
         return 0
-        
+
     # Linear decay for simplicity (can be exponential if needed)
     # 0h -> 50, 12h -> 25, 24h -> 0
     boost = max_boost * (1 - (age_hours / 24))
@@ -264,32 +264,32 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
     """
     if not new_events:
         return 0
-        
+
     added_count = 0
     events_to_write = []
-    
+
     for event in new_events:
         event_id = compute_event_id(event)
-        
+
         # Check if seen in DB
         if not storage.is_duplicate(event_id):
             # Mark as seen
             storage.mark_seen(event_id, event.get('source', 'unknown'), event.get('title', ''))
             events_to_write.append(event)
             added_count += 1
-    
+
     if events_to_write:
         # Ensure parent dir exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(file_path, "a", encoding="utf-8") as f:
             for event in events_to_write:
                 json.dump(event, f, ensure_ascii=False)
                 f.write("\n")
-                
 
 
-def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: Optional[int] = None) -> list[dict]:
+
+def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = None) -> list[dict]:
     """
     Safely read JSONL file, ignoring errors and returning valid events.
     Optionally filters by freshness.
@@ -298,7 +298,7 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: Optional[int]
     try:
         if not path.exists():
             return []
-            
+
         # If filtering by freshness, we might need to read more lines to find enough fresh ones
         # So we read more if freshness filter is active
         read_limit = limit * 5 if freshness_hours else limit
@@ -310,12 +310,12 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: Optional[int]
             if pathway_path.exists() and pathway_path.stat().st_size > 0:
                 path = pathway_path
                 # logger.info(f"Reading from Pathway output: {path}")
-            
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+
+        with open(path, encoding="utf-8", errors="ignore") as f:
             all_lines = f.readlines()
             # Take last 'read_limit' lines
             recent_lines = all_lines[-read_limit:] if len(all_lines) > read_limit else all_lines
-            
+
             # Process in reverse to get newest first, then reverse back
             for line in reversed(recent_lines):
                 line = line.strip()
@@ -341,9 +341,9 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: Optional[int]
                             break
                 except Exception:
                     continue
-        
+
         # Reverse back to chronological order (oldest to newest) if that's what caller expects
-        # But usually for display we want newest first. 
+        # But usually for display we want newest first.
         # The original function returned chronological (append order).
         # Let's keep original behavior: return chronological order.
         return events
@@ -366,10 +366,10 @@ def compute_confidence(evidence: list) -> dict:
             "label": "LOW",
             "reason": "No evidence found in current data stream."
         }
-    
+
     score = 0
     count = len(evidence)
-    
+
     # 1. Evidence Count
     if count >= 6:
         score += 50
@@ -377,17 +377,17 @@ def compute_confidence(evidence: list) -> dict:
         score += 30
     elif count >= 1:
         score += 15
-        
+
     # 2. Recency Factor
     try:
         # Sort evidence by timestamp to find the latest
         sorted_ev = sorted(evidence, key=lambda x: parse_timestamp(x.timestamp) if hasattr(x, 'timestamp') and x.timestamp else datetime.min, reverse=True)
         latest_ts = sorted_ev[0].timestamp if sorted_ev and hasattr(sorted_ev[0], 'timestamp') else None
-        
+
         if latest_ts:
             latest_time = parse_timestamp(latest_ts)
             age_hours = (datetime.utcnow() - latest_time).total_seconds() / 3600
-            
+
             if age_hours < 2:
                 score += 25
             elif age_hours < 12:
@@ -399,16 +399,16 @@ def compute_confidence(evidence: list) -> dict:
     except Exception as e:
         logger.warning(f"Error computing recency for confidence: {e}")
         score += 5
-        
+
     # 3. Source Reliability
     # High trust: Reuters, Bloomberg, Official, etc.
     # Medium: Perplexity, TechCrunch, etc.
     # Low: X, Rumor, etc.
     high_trust = ["reuters", "bloomberg", "official", "press release", "sec", "nasdaq"]
     med_trust = ["perplexity", "techcrunch", "verge", "wired", "wsj", "nyt"]
-    
+
     sources = [str(e.source).lower() if hasattr(e, 'source') else "" for e in evidence]
-    
+
     source_boost = 5 # Default low
     for s in sources:
         if any(ht in s for ht in high_trust):
@@ -416,12 +416,12 @@ def compute_confidence(evidence: list) -> dict:
             break
         if any(mt in s for mt in med_trust):
             source_boost = max(source_boost, 10)
-            
+
     score += source_boost
-    
+
     # Clamp
     score = min(100, score)
-    
+
     # Label
     if score >= 70:
         label = "HIGH"
@@ -429,13 +429,13 @@ def compute_confidence(evidence: list) -> dict:
         label = "MEDIUM"
     else:
         label = "LOW"
-        
+
     # Reason
     recency_str = "very recent" if score >= 25 else "recent" if score >= 15 else "older"
     source_str = "reliable" if source_boost == 15 else "mixed" if source_boost == 10 else "unverified"
-    
+
     reason = f"{count} evidence items found, latest is {recency_str}, {source_str} sources."
-    
+
     return {
         "score": score,
         "label": label,
@@ -447,23 +447,23 @@ def get_trust_info(source_name: str) -> dict:
     Get trust level and reason for a given source.
     """
     source_lower = source_name.lower()
-    
+
     # High Trust Sources
     high_trust = ["reuters", "bloomberg", "sec", "official", "press release", "cnbc", "wsj"]
     for s in high_trust:
         if s in source_lower:
             return {"trust_level": "High", "reason": "Verified institutional news source"}
-            
+
     # Medium Trust Sources
     medium_trust = ["perplexity", "marketwire", "techcrunch", "the verge", "engadget"]
     for s in medium_trust:
         if s in source_lower:
             return {"trust_level": "Medium", "reason": "Reputable tech/market aggregator"}
-            
+
     # Low Trust Sources
     low_trust = ["x", "twitter", "reddit", "blog", "social", "unverified"]
     for s in low_trust:
         if s in source_lower:
             return {"trust_level": "Low", "reason": "Social media or unverified community signal"}
-            
+
     return {"trust_level": "Low", "reason": "Unknown or unverified source"}

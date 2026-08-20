@@ -1,14 +1,14 @@
-import time
 import logging
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from .routes import router
-from .models import QueryResponse
-from .utils import now_ts
+from .scheduler import start_scheduler, stop_scheduler
 from .settings import settings
 from .storage import init_db
-from .scheduler import start_scheduler, stop_scheduler
+from .utils import now_ts
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +38,7 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global exception: {str(exc)}", exc_info=True)
-    
+
     # If it's the query endpoint, return a safe fallback
     if request.url.path.endswith("/query"):
         return JSONResponse(
@@ -52,11 +52,11 @@ async def global_exception_handler(request: Request, exc: Exception):
                 "llm_status": "failed"
             }
         )
-    
+
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "Internal Server Error", 
+            "detail": "Internal Server Error",
             "error": str(exc),
             "path": request.url.path,
             "timestamp": now_ts()

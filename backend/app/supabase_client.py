@@ -1,12 +1,12 @@
 # pyright: reportMissingImports=false
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .settings import settings
 
 logger = logging.getLogger(__name__)
 
-_supabase_client: Optional[Any] = None
+_supabase_client: Any | None = None
 _supabase_failed = False
 
 
@@ -23,7 +23,7 @@ def is_supabase_enabled() -> bool:
     return True
 
 
-def get_supabase_client() -> Optional[Any]:
+def get_supabase_client() -> Any | None:
     global _supabase_client, _supabase_failed
 
     if _supabase_client is not None:
@@ -52,7 +52,7 @@ def get_supabase_client() -> Optional[Any]:
         return None
 
 
-def ensure_user(user_id: str, email: Optional[str] = None) -> bool:
+def ensure_user(user_id: str, email: str | None = None) -> bool:
     """
     Ensure user exists in Supabase. 
     Creates user if not exists, updates email if provided.
@@ -74,14 +74,14 @@ def ensure_user(user_id: str, email: Optional[str] = None) -> bool:
     try:
         logger.debug(f"Upserting user {user_id} with payload {payload}")
         response = client.table("users").upsert(payload, on_conflict="id").execute()
-        
+
         if response.data:
             logger.info(f"✓ User {user_id} successfully synced to Supabase (email: {email})")
             return True
         else:
             logger.warning(f"Supabase upsert for user {user_id} returned empty data")
             return False
-            
+
     except Exception as exc:
         logger.error(f"✗ Supabase ensure_user failed for {user_id}: {exc}", exc_info=True)
         return False
@@ -93,7 +93,7 @@ def insert_query_record(
     k: int,
     evidence_count: int,
     signal_strength: int,
-) -> Optional[str]:
+) -> str | None:
     client = get_supabase_client()
     if client is None:
         return None
@@ -119,7 +119,7 @@ def insert_query_record(
             if row_id:
                 logger.info(f"✓ Query record {row_id} stored for user {user_id}")
                 return str(row_id)
-        
+
         logger.warning(f"Query insert returned empty data for user {user_id}")
         return None
     except Exception as exc:
@@ -134,8 +134,8 @@ def insert_insight_record(
     insight: str,
     model_name: str,
     status: str,
-    query_id: Optional[str] = None,
-) -> Optional[str]:
+    query_id: str | None = None,
+) -> str | None:
     client = get_supabase_client()
     if client is None:
         return None
@@ -159,7 +159,7 @@ def insert_insight_record(
             if row_id:
                 logger.info(f"✓ Insight record {row_id} stored for user {user_id} (status={status})")
                 return str(row_id)
-        
+
         logger.warning(f"Insight insert returned empty data for user {user_id}")
         return None
     except Exception as exc:
@@ -174,10 +174,10 @@ def insert_signal_record(
     title: str,
     content: str,
     timestamp: str,
-    company: Optional[str] = None,
-    event_type: Optional[str] = None,
-    url: Optional[str] = None,
-) -> Optional[str]:
+    company: str | None = None,
+    event_type: str | None = None,
+    url: str | None = None,
+) -> str | None:
     client = get_supabase_client()
     if client is None:
         return None
@@ -201,7 +201,7 @@ def insert_signal_record(
             if row_id:
                 logger.info(f"✓ Signal record {row_id} stored for user {user_id} (source={source})")
                 return str(row_id)
-        
+
         logger.warning(f"Signal insert returned empty data for user {user_id}")
         return None
     except Exception as exc:

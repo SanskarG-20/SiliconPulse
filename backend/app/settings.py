@@ -1,11 +1,12 @@
-import os
 import platform
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
-    
+
     app_name: str = "SiliconPulse API"
     clerk_issuer: str = ""
     clerk_audience: str = ""
@@ -17,27 +18,27 @@ class Settings(BaseSettings):
     data_stream_path: str = "data/stream.jsonl"
     host: str = "0.0.0.0"
     port: int = 8000
-    
+
     # Deduplication & Freshness Settings
     freshness_hours: int = 12
     max_events_to_scan: int = 500
     dedup_enabled: bool = True
     checkpoint_enabled: bool = True
     db_path: str = "data/siliconpulse.db"
-    
+
     # Pathway Settings - Default False on Windows since Pathway doesn't run natively
     use_pathway: bool = platform.system() != "Windows"
     pathway_output_path: str = "data/pathway_out.jsonl"
-    
+
     # GDELT Settings (free API)
     gdelt_enabled: bool = True
-    
+
     # HackerNews Settings (free Algolia API)
     hackernews_enabled: bool = True
 
     # External news providers (free APIs)
     newsapi_api_key: str = ""
-    
+
     model_config = SettingsConfigDict(
         env_file = ".env",
         env_file_encoding = "utf-8",

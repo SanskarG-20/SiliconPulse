@@ -1,9 +1,9 @@
 import logging
+import threading
+
+from .services.news_sources import ingest_news_stream_sync
 from .sources.gdelt_source import pull_gdelt_signals
 from .sources.hackernews_source import pull_hn_signals
-from .services.news_sources import ingest_news_stream_sync
-import threading
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def pull_all_sources():
     """Pull data from all sources (News APIs + GDELT + HackerNews)"""
     try:
         logger.info("Starting scheduled data pull...")
-        
+
         # Pull from unified news sources (aggregates all 4 APIs)
         news_result = ingest_news_stream_sync()
         logger.info(f"News APIs: {news_result}")
@@ -28,18 +28,18 @@ def pull_all_sources():
         if isinstance(news_result, dict):
             news_added_value = news_result.get("new_added")
             news_added = news_added_value if isinstance(news_added_value, int) else 0
-        
+
         # Pull from GDELT
         gdelt_count = pull_gdelt_signals() or 0
         logger.info(f"Pulled {gdelt_count} events from GDELT")
-        
+
         # Pull from HackerNews
         hn_count = pull_hn_signals() or 0
         logger.info(f"Pulled {hn_count} events from HackerNews")
-        
+
         total = news_added + gdelt_count + hn_count
         logger.info(f"Total: {total} new events added to stream")
-        
+
     except Exception as e:
         logger.error(f"Error during scheduled pull: {e}", exc_info=True)
 
@@ -51,7 +51,7 @@ def start_scheduler():
             pull_all_sources()
         except Exception as e:
             logger.error(f"Initial data pull failed: {e}", exc_info=True)
-    
+
     # Start initial pull in background thread
     initial_thread = threading.Thread(target=initial_pull, daemon=True)
     initial_thread.start()
@@ -67,7 +67,7 @@ def start_scheduler():
         _fallback_thread = threading.Thread(target=fallback_loop, daemon=True)
         _fallback_thread.start()
         return
-    
+
     # Schedule pulls every 5 minutes
     if not scheduler.get_job('pull_sources'):
         scheduler.add_job(pull_all_sources, 'interval', minutes=5, id='pull_sources')

@@ -3,7 +3,7 @@ import requests
 from pathlib import Path
 from datetime import datetime, timedelta
 from ..settings import settings
-from ..utils import deduplicate_and_append, get_current_timestamp
+from ..utils import deduplicate_and_append, get_current_timestamp, get_primary_company, classify_event_type
 from .. import storage
 from ..company_dict import COMPANY_DICT
 import logging
@@ -13,44 +13,23 @@ logger = logging.getLogger(__name__)
 
 def map_company_from_text(text: str) -> str:
     """
-    Simple heuristic to map article text to known companies.
+    Map article text to known companies using centralized utility.
     Returns company name if found, else "Unknown".
     """
     if not text:
         return "Unknown"
     
-    text_lower = text.lower()
-    for company, data in COMPANY_DICT.items():
-        # Check company name and aliases
-        if company.lower() in text_lower:
-            return company
-        for alias in data.get("aliases", []):
-            if alias.lower() in text_lower:
-                return company
-    
-    return "Unknown"
+    company = get_primary_company(text)
+    return company if company else "Unknown"
 
 
 def classify_event_type(title: str, content: str) -> str:
     """
-    Simple heuristic to classify event type based on keywords.
+    Classify event type using centralized utility.
+    Returns snake_case event type.
     """
-    text = (title + " " + content).lower()
-    
-    if any(word in text for word in ["acquired", "acquisition", "acqu", "bought", "deal"]):
-        return "Acquisition"
-    elif any(word in text for word in ["partnership", "partner", "collaborate", "joint", "agreement"]):
-        return "Contract"
-    elif any(word in text for word in ["launched", "launch", "unveiled", "announce", "release", "open-source"]):
-        return "Launch"
-    elif any(word in text for word in ["produce", "production", "manufacturing", "fab", "yield", "fabrication"]):
-        return "Manufacturing"
-    elif any(word in text for word in ["supply", "supply chain", "shortage", "capacity"]):
-        return "Supply Chain"
-    elif any(word in text for word in ["ai", "artificial intelligence", "model", "gpt", "llama"]):
-        return "AI"
-    else:
-        return "General"
+    from ..utils import classify_event_type as _classify
+    return _classify(title, content)
 
 
 def pull_gdelt_signals(max_articles: int = 50) -> int:

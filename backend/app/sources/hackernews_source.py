@@ -3,50 +3,31 @@ import requests
 from pathlib import Path
 from datetime import datetime
 from ..settings import settings
-from ..utils import deduplicate_and_append, get_current_timestamp
+from ..utils import deduplicate_and_append, get_current_timestamp, get_primary_company, classify_event_type
 from .. import storage
-from ..company_dict import COMPANY_DICT
 import logging
 import time
 logger = logging.getLogger(__name__)
 
 def map_company_from_text(text: str) -> str:
     """
-    Simple heuristic to map HN post to known companies.
+    Map HN post to known companies using centralized utility.
     Returns company name if found, else "Unknown".
     """
     if not text:
         return "Unknown"
     
-    text_lower = text.lower()
-    for company, data in COMPANY_DICT.items():
-        if company.lower() in text_lower:
-            return company
-        for alias in data.get("aliases", []):
-            if alias.lower() in text_lower:
-                return company
-    
-    return "Unknown"
+    company = get_primary_company(text)
+    return company if company else "Unknown"
 
 
 def classify_event_type(title: str, content: str) -> str:
     """
-    Simple heuristic to classify event type based on keywords.
+    Classify event type using centralized utility.
+    Returns snake_case event type.
     """
-    text = (title + " " + content).lower()
-    
-    if any(word in text for word in ["acquired", "acquisition", "acqu", "bought"]):
-        return "Acquisition"
-    elif any(word in text for word in ["partnership", "partner", "collaborate"]):
-        return "Contract"
-    elif any(word in text for word in ["launched", "launch", "unveiled", "announce"]):
-        return "Launch"
-    elif any(word in text for word in ["produce", "production", "manufacturing", "fab"]):
-        return "Manufacturing"
-    elif any(word in text for word in ["ai", "artificial intelligence", "model", "llm", "gpt"]):
-        return "AI"
-    else:
-        return "General"
+    from ..utils import classify_event_type as _classify
+    return _classify(title, content)
 
 
 def pull_hn_signals(max_stories: int = 100) -> int:

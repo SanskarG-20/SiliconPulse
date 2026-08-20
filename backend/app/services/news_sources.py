@@ -9,7 +9,7 @@ from typing import Optional
 import httpx
 
 from ..settings import settings
-from ..utils import deduplicate_and_append, get_current_timestamp, extract_companies
+from ..utils import deduplicate_and_append, get_current_timestamp, extract_companies, classify_event_type
 
 logger = logging.getLogger(__name__)
 
@@ -37,25 +37,6 @@ def _map_company(text: str) -> Optional[str]:
     return None
 
 
-def _classify_event(text: str) -> str:
-    t = text.lower()
-    if any(w in t for w in ["acquired", "acquisition", "acqu", "bought", "deal", "merger"]):
-        return "m_and_a"
-    if any(w in t for w in ["partnership", "partner", "collaborate", "joint", "agreement"]):
-        return "contract"
-    if any(w in t for w in ["launched", "launch", "unveiled", "announce", "release", "open-source"]):
-        return "product_launch"
-    if any(w in t for w in ["produce", "production", "manufacturing", "fab", "yield", "fabrication"]):
-        return "supply_chain"
-    if any(w in t for w in ["supply", "shortage", "capacity", "export control", "sanction"]):
-        return "supply_chain"
-    if any(w in t for w in ["earnings", "revenue", "profit", "quarter", "stock"]):
-        return "financial"
-    if any(w in t for w in ["ai ", "artificial intelligence", "model", "gpt", "llama", "gemini"]):
-        return "product_launch"
-    return "general"
-
-
 def _hash_title_url(title: str, url: str) -> str:
     return hashlib.sha256(f"{title}|{url}".encode()).hexdigest()
 
@@ -79,7 +60,7 @@ def _normalize(article: dict) -> dict:
         "content": snippet,
         "url": url,
         "company": article.get("company") or _map_company(text),
-        "event_type": article.get("event_type") or _classify_event(text),
+        "event_type": article.get("event_type") or classify_event_type(title, snippet),
     }
 
 

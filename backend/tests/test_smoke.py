@@ -15,7 +15,11 @@ def test_health_check():
     """Test the /health endpoint"""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "online", "service": "siliconpulse-backend"}
+    data = response.json()
+    assert data["service"] == "siliconpulse-backend"
+    assert data["status"] in ["online", "degraded"]
+    assert "checks" in data
+    assert "uptime_seconds" in data
 
 def test_get_signals():
     """Test the /api/signals endpoint to ensure it returns a valid response"""

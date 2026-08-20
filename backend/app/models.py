@@ -1,3 +1,4 @@
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,14 +11,14 @@ class QueryRequest(BaseModel):
 
 class EvidenceItem(BaseModel):
     """Evidence item from the data stream"""
-    timestamp: str | None = Field(None, description="Timestamp of the event")
-    source: str | None = Field(None, description="Source of the information")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the event")
+    source: Optional[str] = Field(None, description="Source of the information")
     title: str = Field(..., description="Title of the evidence")
     snippet: str = Field(..., description="Content snippet or description")
-    company: str | None = Field(None, description="Related company name")
-    event_type: str | None = Field(None, description="Type of event")
-    url: str | None = Field(None, description="URL of the event")
-    event_id: str | None = Field(None, description="Unique event ID")
+    company: Optional[str] = Field(None, description="Related company name")
+    event_type: Optional[str] = Field(None, description="Type of event")
+    url: Optional[str] = Field(None, description="URL of the event")
+    event_id: Optional[str] = Field(None, description="Unique event ID")
 
 class ConfidenceInfo(BaseModel):
     """Confidence information for the query results"""
@@ -32,17 +33,17 @@ class QueryResponse(BaseModel):
     evidence: list[EvidenceItem] = Field(..., description="List of evidence items")
     signal_strength: int = Field(..., description="Strength of the signal (0-100)")
     last_updated: str = Field(..., description="Timestamp of last update")
-    report: str | None = Field(None, description="Generated intelligence report")
-    llm_status: str | None = Field("pending", description="Status of LLM generation")
-    confidence: ConfidenceInfo | None = Field(None, description="Dynamic confidence assessment")
-    stream_path_used: str | None = Field(None, description="Path of the stream file used")
+    report: Optional[str] = Field(None, description="Generated intelligence report")
+    llm_status: Optional[str] = Field("pending", description="Status of LLM generation")
+    confidence: Optional[ConfidenceInfo] = Field(None, description="Dynamic confidence assessment")
+    stream_path_used: Optional[str] = Field(None, description="Path of the stream file used")
 
 
 class InjectRequest(BaseModel):
     """Request model for manually injecting data into the stream"""
     title: str = Field(..., description="Title of the injected item")
     content: str = Field(..., description="Content of the injected item")
-    timestamp: str | None = Field(None, description="Timestamp of the event")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the event")
     source: str = Field(default="ManualInject", description="Source identifier")
 
 
@@ -50,16 +51,16 @@ class InjectResponse(BaseModel):
     """Response model for data injection"""
     status: str = Field(..., description="Status of the injection operation")
     injected_at: str = Field(..., description="Timestamp when the data was injected")
-    stream_path_used: str | None = Field(None, description="Path of the stream file used")
+    stream_path_used: Optional[str] = Field(None, description="Path of the stream file used")
 
 
 class SignalCompact(BaseModel):
     """Compact signal representation for list view"""
-    timestamp: str | None = Field(None, description="Timestamp of the event")
-    company: str | None = Field(None, description="Related company name")
-    event_type: str | None = Field(None, description="Type of event")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the event")
+    company: Optional[str] = Field(None, description="Related company name")
+    event_type: Optional[str] = Field(None, description="Type of event")
     title: str = Field(..., description="Title of the evidence")
-    source: str | None = Field(None, description="Source of the information")
+    source: Optional[str] = Field(None, description="Source of the information")
 
 
 class RadarStatus(BaseModel):
@@ -91,10 +92,10 @@ class ExportRequest(BaseModel):
 
 class SourceVerifyItem(BaseModel):
     """Verification item for a source"""
-    timestamp: str | None = Field(None, description="Timestamp of the event")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the event")
     source: str = Field(..., description="Source name")
     title: str = Field(..., description="Title/Headline")
-    url: str | None = Field(None, description="URL if available")
+    url: Optional[str] = Field(None, description="URL if available")
     trust_level: str = Field(..., description="High, Medium, or Low")
     reason: str = Field(..., description="Reason for trust level")
 

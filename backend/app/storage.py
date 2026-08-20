@@ -2,6 +2,8 @@
 Storage module for SiliconPulse backend.
 Handles SQLite database connections, deduplication persistence, and source checkpointing.
 """
+from __future__ import annotations
+
 import logging
 import sqlite3
 import threading

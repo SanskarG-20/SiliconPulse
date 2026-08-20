@@ -99,23 +99,14 @@ async def get_signals():
         if not data_path.exists():
             return []
             
-        # Read fresh events
+        # Read fresh events (already deduplicated at write time via deduplicate_and_append)
         events = safe_read_jsonl(
             data_path, 
             limit=20, # Top 20
             freshness_hours=settings.freshness_hours
         )
         
-        # Deduplicate
-        seen = set()
-        unique_events = []
-        for event in events:
-            key = (event.get("title"), event.get("source"))
-            if key not in seen:
-                seen.add(key)
-                unique_events.append(event)
-                
-        return unique_events
+        return events
     except Exception as e:
         print(f"Signals Error: {e}")
         return []
@@ -145,17 +136,15 @@ async def inject_signal(request: InjectRequest, user=Depends(get_current_user)):
             "source": request.source
         }
         
-        # Compute ID
-        event_id = compute_event_id(data_entry)
-        
-        # Append as JSON line to the file
+        # Use centralized deduplication (checks SQLite + appends to file)
         data_path = settings.resolved_data_path
-        with open(data_path, "a", encoding="utf-8") as f:
-            json.dump(data_entry, f, ensure_ascii=False)
-            f.write("\n")
-            
-        # Mark as seen
-        storage.mark_seen(event_id, request.source, request.title)
+        added_count = deduplicate_and_append([data_entry], data_path)
+        
+        if added_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Duplicate signal: already exists in stream"
+            )
 
         # Persist manual signal in Supabase (optional if Supabase vars are configured)
         user_id = user.get("user_id")

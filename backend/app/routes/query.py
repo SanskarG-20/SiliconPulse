@@ -265,7 +265,7 @@ async def generate_insight(request: GenerateRequest, user=Depends(get_current_us
             data_path = settings.resolved_data_path
             latest_events = safe_read_jsonl(data_path, limit=3)
 
-            from .company_dict import COMPANY_DICT
+            from ..company_dict import COMPANY_DICT
             suggestions = []
             query_upper = request.query.upper()
 

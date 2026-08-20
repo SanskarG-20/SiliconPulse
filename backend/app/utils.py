@@ -13,41 +13,151 @@ import logging
 # We'll import inside functions where needed or rely on caller to pass dependencies if strict separation required
 # But for this app structure, direct import is fine as storage doesn't import utils
 from . import storage
+from .company_dict import COMPANY_DICT
 
 logger = logging.getLogger(__name__)
 
-import re
+# Compile regex once at module load
+_COMPANY_PATTERN = re.compile(r'\b[A-Z][a-zA-Z0-9]+(?: [&-] [A-Z][a-zA-Z0-9]+)*\b')
+_STOPWORDS = {"The", "A", "An", "In", "On", "At", "To", "From", "By", "With", "As", "It", "This", "That", "For", "But", "And", "Or", "If", "When"}
+# Known acronyms that look like companies but aren't
+_KNOWN_ACRONYMS = {"GPU", "CPU", "AI", "API", "SDK", "UI", "UX", "IoT", "ML", "LLM", "GPT", "TPU", "NPU", "VPU", "FPGA", "ASIC", "SoC", "RAM", "SSD", "HDD", "USB", "PCIe", "DDR", "HBM", "EUV", "CoWoS", "TSMC", "SKU", "IPO", "CEO", "CTO", "CFO"}
+
+# Build alias-to-canonical mapping from COMPANY_DICT for fast lookup
+# Sort aliases by length (longest first) to match multi-word aliases before single words
+_COMPANY_ALIAS_MAP: dict[str, str] = {}
+_alias_entries = []
+for canonical, data in COMPANY_DICT.items():
+    _alias_entries.append((canonical.lower(), canonical))
+    for alias in data.get("aliases", []):
+        _alias_entries.append((alias.lower(), canonical))
+
+# Sort by alias length descending so "jensen huang" matches before "jensen"
+_alias_entries.sort(key=lambda x: len(x[0]), reverse=True)
+for alias_lower, canonical in _alias_entries:
+    if alias_lower not in _COMPANY_ALIAS_MAP:
+        _COMPANY_ALIAS_MAP[alias_lower] = canonical
 
 def extract_companies(text: str) -> list[str]:
     """
-    Extract organization names from text using basic regex heuristics.
-    (Spacy was blocked by Windows Application Control policies).
+    Extract organization names from text using COMPANY_DICT aliases + regex heuristics.
+    Returns canonical company names from COMPANY_DICT where possible.
     """
     if not text:
         return []
-        
-    # Matches consecutive capitalized words, optionally with & or -
-    pattern = r'\b[A-Z][a-zA-Z0-9]+(?: [&-] [A-Z][a-zA-Z0-9]+)*\b'
-    matches = re.findall(pattern, text)
     
-    # Filter out common stop words that get capitalized at sentence starts
-    stopwords = {"The", "A", "An", "In", "On", "At", "To", "From", "By", "With", "As", "It", "This", "That", "For", "But", "And", "Or", "If", "When"}
+    text_lower = text.lower()
+    found_canonical = set()
+    matched_words = set()  # Track individual words that are part of matched aliases
     
-    companies = []
+    # 1. First pass: Check COMPANY_DICT aliases (high precision) - longest first
+    for alias_lower, canonical in _alias_entries:
+        if alias_lower in text_lower:
+            # Find all occurrences of this alias
+            start = 0
+            while True:
+                idx = text_lower.find(alias_lower, start)
+                if idx == -1:
+                    break
+                # Track individual words in this alias to exclude from regex pass
+                alias_words = alias_lower.split()
+                for word in alias_words:
+                    matched_words.add(word)
+                found_canonical.add(canonical)
+                start = idx + 1
+    
+    # 2. Second pass: Regex for unknown companies (broad recall)
+    matches = _COMPANY_PATTERN.findall(text)
     for m in matches:
-        if m not in stopwords and len(m) > 2:
-            companies.append(m)
-            
-    # Deduplicate while preserving order
-    seen = set()
-    unique = []
-    for c in companies:
-        cl = c.lower()
-        if cl not in seen:
-            seen.add(cl)
-            unique.append(c)
-            
-    return unique
+        if m not in _STOPWORDS and len(m) > 2 and m not in _KNOWN_ACRONYMS:
+            m_lower = m.lower()
+            # Skip if this word was part of a matched multi-word alias
+            if m_lower in matched_words:
+                continue
+            # If this matches a known alias, use canonical; otherwise use as-is
+            canonical = _COMPANY_ALIAS_MAP.get(m_lower)
+            if canonical:
+                found_canonical.add(canonical)
+            elif m_lower not in {c.lower() for c in found_canonical}:
+                found_canonical.add(m)
+    
+    return list(found_canonical)
+
+def get_primary_company(text: str) -> Optional[str]:
+    """Get the first/most relevant company from text, or None."""
+    companies = extract_companies(text)
+    return companies[0] if companies else None
+
+
+# Unified event type classification keywords (snake_case labels)
+_EVENT_TYPE_KEYWORDS = {
+    # M&A
+    "acquired": "m_and_a",
+    "acquisition": "m_and_a",
+    "acqu": "m_and_a",
+    "bought": "m_and_a",
+    "deal": "m_and_a",
+    "merger": "m_and_a",
+    # Contract/Partnership
+    "contract": "contract",
+    "deal": "contract",
+    "partnership": "contract",
+    "partner": "contract",
+    "collaborate": "contract",
+    "joint": "contract",
+    "agreement": "contract",
+    # Product Launch
+    "launch": "product_launch",
+    "release": "product_launch",
+    "launched": "product_launch",
+    "unveiled": "product_launch",
+    "announce": "product_launch",
+    "open-source": "product_launch",
+    # Supply Chain / Manufacturing
+    "supply": "supply_chain",
+    "yield": "supply_chain",
+    "foundry": "supply_chain",
+    "fab": "supply_chain",
+    "produce": "supply_chain",
+    "production": "supply_chain",
+    "manufacturing": "supply_chain",
+    "fabrication": "supply_chain",
+    "shortage": "supply_chain",
+    "capacity": "supply_chain",
+    "export control": "supply_chain",
+    "sanction": "supply_chain",
+    # Financial
+    "earnings": "financial",
+    "revenue": "financial",
+    "profit": "financial",
+    "quarter": "financial",
+    "stock": "financial",
+    # AI / Tech
+    "ai ": "product_launch",
+    "artificial intelligence": "product_launch",
+    "model": "product_launch",
+    "gpt": "product_launch",
+    "llama": "product_launch",
+    "gemini": "product_launch",
+    "llm": "product_launch",
+}
+
+def classify_event_type(title: str, content: str = "") -> str:
+    """
+    Classify event type based on title and content keywords.
+    Returns snake_case event type (m_and_a, contract, product_launch, supply_chain, financial, general).
+    """
+    if not title and not content:
+        return "general"
+    
+    text = (title + " " + content).lower()
+    
+    # Check keywords in priority order (more specific first)
+    for keyword, event_type in _EVENT_TYPE_KEYWORDS.items():
+        if keyword in text:
+            return event_type
+    
+    return "general"
 
 def get_current_timestamp() -> str:
     """Get current timestamp in ISO format"""

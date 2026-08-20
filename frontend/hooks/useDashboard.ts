@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import useSWR from 'swr';
 import { LiveEvent } from '../types';
 import { INITIAL_LIVE_FEED } from '../constants';
 import { buildLiveFeed, createLiveEvent, getRelativeTimeLabel, rotateFeed } from '../utils/feedUtils';
@@ -193,44 +194,64 @@ export const useDashboard = (): UseDashboardReturn => {
     });
   }, [liveFeed, watchlist]);
 
-  const refreshSignals = useCallback(async () => {
-    try {
-      const signals = await fetchSignals();
-      if (signals && signals.length > 0) {
-        const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => createLiveEvent(s, idx));
-        const ordered = buildLiveFeed(mappedSignals, 10);
+  const processSignals = useCallback((signals: any[]) => {
+    if (signals && signals.length > 0) {
+      const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => createLiveEvent(s, idx));
+      const ordered = buildLiveFeed(mappedSignals, 10);
 
-        if (ordered.length === 0) {
-          setLiveFeed(INITIAL_LIVE_FEED);
-          return;
-        }
-
-        feedRotationRef.current = (feedRotationRef.current + 1) % ordered.length;
-        const rotated = rotateFeed(ordered, feedRotationRef.current);
-        setLiveFeed(rotated);
-        const recommendationsResult = generateRecommendationsFromFeed(
-          ordered,
-          recommendationKeysRef.current,
-          remoteRecommendationsRef.current
-        );
-        recommendationKeysRef.current = recommendationsResult.nextKeys;
-        setRecommendations(recommendationsResult.recommendations);
+      if (ordered.length === 0) {
+        setLiveFeed(INITIAL_LIVE_FEED);
         return;
       }
 
-      setLiveFeed(INITIAL_LIVE_FEED);
-      const fallbackResult = generateRecommendationsFromFeed(
-        INITIAL_LIVE_FEED,
+      feedRotationRef.current = (feedRotationRef.current + 1) % ordered.length;
+      const rotated = rotateFeed(ordered, feedRotationRef.current);
+      setLiveFeed(rotated);
+      const recommendationsResult = generateRecommendationsFromFeed(
+        ordered,
         recommendationKeysRef.current,
         remoteRecommendationsRef.current
       );
-      recommendationKeysRef.current = fallbackResult.nextKeys;
-      setRecommendations(fallbackResult.recommendations);
+      recommendationKeysRef.current = recommendationsResult.nextKeys;
+      setRecommendations(recommendationsResult.recommendations);
+      return;
+    }
+
+    setLiveFeed(INITIAL_LIVE_FEED);
+    const fallbackResult = generateRecommendationsFromFeed(
+      INITIAL_LIVE_FEED,
+      recommendationKeysRef.current,
+      remoteRecommendationsRef.current
+    );
+    recommendationKeysRef.current = fallbackResult.nextKeys;
+    setRecommendations(fallbackResult.recommendations);
+  }, []);
+
+  const refreshSignals = useCallback(async () => {
+    try {
+      const signals = await fetchSignals();
+      processSignals(signals);
     } catch (err) {
       console.error("Failed to refresh signals:", err);
       notify("Live feed refresh failed. Showing cached signals.");
     }
-  }, [notify]);
+  }, [notify, processSignals]);
+
+  // SWR: poll signals every 5s with deduping, stale-while-revalidate
+  const { data: swrSignals, mutate: mutateSignals } = useSWR('signals', fetchSignals, {
+    refreshInterval: 5000,
+    dedupingInterval: 4000,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+    fallbackData: [],
+  });
+
+  // Process SWR data when it changes
+  useEffect(() => {
+    if (swrSignals) {
+      processSignals(swrSignals);
+    }
+  }, [swrSignals, processSignals]);
 
   useEffect(() => {
     const init = async () => {
@@ -241,7 +262,8 @@ export const useDashboard = (): UseDashboardReturn => {
       }
 
       await bootstrapSystem();
-      refreshSignals();
+      // Trigger SWR revalidation instead of manual refresh
+      mutateSignals();
 
       fetchRecommendations().then(recs => {
         if (recs && recs.length > 0) {
@@ -259,10 +281,7 @@ export const useDashboard = (): UseDashboardReturn => {
     };
 
     init();
-
-    const interval = setInterval(refreshSignals, 5000);
-    return () => clearInterval(interval);
-  }, [refreshSignals]);
+  }, [mutateSignals]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -351,7 +370,7 @@ export const useDashboard = (): UseDashboardReturn => {
       setInjectContent('');
       setInjectSource('ManualInject');
 
-      await refreshSignals();
+      await mutateSignals();
       notify("Signal injected and feed refreshed.");
       setTimeout(() => {
         setInjectSuccess(false);
@@ -365,7 +384,7 @@ export const useDashboard = (): UseDashboardReturn => {
     } finally {
       setInjectLoading(false);
     }
-  }, [injectTitle, injectContent, injectSource, refreshSignals, notify]);
+  }, [injectTitle, injectContent, injectSource, mutateSignals, notify]);
 
   const handleExport = useCallback(async () => {
     if (!queryResult || !insight) return;

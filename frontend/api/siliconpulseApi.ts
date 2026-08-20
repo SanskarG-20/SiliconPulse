@@ -305,3 +305,28 @@ export const fetchGraphImpact = async (company: string, depth: number = 2): Prom
         return null;
     }
 };
+
+export const simulateGraph = async (company: string, shock: number, depth: number = 2, metric: string = "yield"): Promise<any | null> => {
+    try {
+        const response = await apiFetch(`/graph/simulate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company, shock, depth, metric }),
+        });
+        if (!response.ok) return null;
+        return await parseJsonSafely(response, null);
+    } catch {
+        return null;
+    }
+};
+
+export const fetchMetrics = async (): Promise<any | null> => {
+    try {
+        const base = BASE_URL.replace('/api', '');
+        const response = await withTimeout(fetch(`${base}/metrics`), new AbortController(), 5000);
+        if (!response.ok) return null;
+        return await parseJsonSafely(response, null);
+    } catch {
+        return null;
+    }
+};

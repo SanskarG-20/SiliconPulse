@@ -53,5 +53,5 @@ async def bootstrap_system():
             "message": f"Bootstrapped {added_count} fresh events"
         }
     except Exception as e:
-        print(f"Bootstrap Error: {e}")
+        logger.error(f"Bootstrap Error: {e}")
         return {"status": "error", "new_events": 0, "error": str(e)}

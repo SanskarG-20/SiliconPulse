@@ -1,11 +1,14 @@
 import random
 from datetime import datetime
 
+import logging
 from fastapi import APIRouter, Depends
 
 from ..core.auth import get_current_user
 from ..settings import settings
 from ..utils import safe_read_jsonl
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -94,7 +97,7 @@ async def get_recommendations():
         }
 
     except Exception as e:
-        print(f"Recommendation Error: {e}")
+        logger.error(f"Recommendation Error: {e}")
         return {
             "recommended_queries": [
                 {"label": "NVIDIA-TSMC Pipeline", "query": "Any new NVIDIA-TSMC contract today?", "icon": "Zap", "color": "text-amber-400"},

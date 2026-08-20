@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core.auth import get_current_user
@@ -8,6 +9,8 @@ from ..models import InjectRequest, InjectResponse
 from ..settings import settings
 from ..supabase_client import ensure_user, insert_signal_record
 from ..utils import deduplicate_and_append, safe_read_jsonl
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -28,7 +31,7 @@ async def get_signals():
 
         return events
     except Exception as e:
-        print(f"Signals Error: {e}")
+        logger.error(f"Signals Error: {e}")
         return []
 
 

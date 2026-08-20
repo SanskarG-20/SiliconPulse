@@ -182,7 +182,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
         return QueryResponse(**result)
 
     except Exception as e:
-        print(f"Query Error: {e}")
+        logger.error(f"Query Error: {e}")
         return QueryResponse(
             query=body.query,
             evidence=[],
@@ -233,7 +233,7 @@ async def get_radar():
         return radar_list[:15]
 
     except Exception as e:
-        print(f"Radar Error: {e}")
+        logger.error(f"Radar Error: {e}")
         return []
 
 

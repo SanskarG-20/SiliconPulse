@@ -285,3 +285,23 @@ export const verifySources = async (query: string): Promise<any> => {
         throw normalizeError(error);
     }
 };
+
+export const fetchGraphExplain = async (company: string, depth: number = 2): Promise<any | null> => {
+    try {
+        const response = await apiFetch(`/graph/explain/${encodeURIComponent(company)}?depth=${depth}`);
+        if (!response.ok) return null;
+        return await parseJsonSafely(response, null);
+    } catch {
+        return null;
+    }
+};
+
+export const fetchGraphImpact = async (company: string, depth: number = 2): Promise<any | null> => {
+    try {
+        const response = await apiFetch(`/graph/impact/${encodeURIComponent(company)}?depth=${depth}`);
+        if (!response.ok) return null;
+        return await parseJsonSafely(response, null);
+    } catch {
+        return null;
+    }
+};

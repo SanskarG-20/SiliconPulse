@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, ShieldAlert } from 'lucide-react';
 import { CompanyRadar } from '../CompanyRadar';
+import { GraphPanel } from '../GraphPanel';
 import { getRelativeTimeLabel } from '../../utils/feedUtils';
 import { LiveEvent } from '../../types';
 
@@ -18,6 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleWatchlist,
 }) => {
   const filteredFeed = feed;
+  const graphCompany = feed.find(f => f.company && f.company !== 'Unknown')?.company || feed[0]?.company;
 
   return (
     <aside className="w-80 border-r border-slate-800/40 bg-slate-950/20 p-6 space-y-8 hidden lg:block overflow-y-auto custom-scrollbar">
@@ -68,6 +70,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           "Focus on TSMC N2 yield milestones. Early reports suggest Apple/NVIDIA bidding war for initial capacity. Cross-ref with GlobalFoundries delays."
         </p>
       </div>
+
+      <GraphPanel company={graphCompany} />
     </aside>
   );
 };

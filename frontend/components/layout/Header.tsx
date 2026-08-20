@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Search, Home, RefreshCw, Coffee, Moon, Sun, Menu, Zap, Activity 
+  Search, Home, RefreshCw, Coffee, Moon, Sun, Menu, Zap, Activity, X 
 } from 'lucide-react';
 
 interface HeaderProps {

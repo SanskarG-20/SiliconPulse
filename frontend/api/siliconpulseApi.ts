@@ -55,14 +55,9 @@ const parseJsonSafely = async <T>(response: Response, fallback: T): Promise<T> =
 
 const normalizeEvidence = (value: any): any[] => Array.isArray(value) ? value : [];
 
-export interface QueryResponse {
-    query: string;
-    evidence: any[];
-    signal_strength: number;
-    last_updated: string;
-    report?: string | null;
-    llm_status?: string;
-}
+import { QueryResponse as QueryResponseType } from '../types';
+
+export type QueryResponse = QueryResponseType;
 
 export interface InjectResponse {
     status: string;

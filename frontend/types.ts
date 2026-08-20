@@ -9,6 +9,7 @@ export interface LiveEvent {
   content: string;
   impactScore: number;
   company: string;
+  event_type?: string;
 }
 
 export interface EvidenceItem {
@@ -16,10 +17,12 @@ export interface EvidenceItem {
   source?: string;
   title: string;
   snippet: string;
+  content?: string;
   company?: string;
   event_type?: string;
   url?: string;
   event_id?: string;
+  trust_level?: string;
 }
 
 export interface ConfidenceInfo {

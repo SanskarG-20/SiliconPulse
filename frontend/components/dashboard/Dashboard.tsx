@@ -78,6 +78,8 @@ const Dashboard: React.FC = () => {
     retryInsight,
     refreshSignals,
     scrollRef,
+    setLoading,
+    setError,
   } = useDashboard();
 
   return (

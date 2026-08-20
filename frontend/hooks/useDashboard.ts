@@ -29,6 +29,8 @@ interface UseDashboardReturn {
   insight: string | null;
   loading: boolean;
   error: string | null;
+  setLoading: (v: boolean) => void;
+  setError: (v: string | null) => void;
   toast: string | null;
   lastUpdate: string;
   recommendations: any[];
@@ -367,6 +369,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
   const handleExport = useCallback(async () => {
     if (!queryResult || !insight) return;
+    const evidenceItems = Array.isArray(queryResult?.evidence) ? queryResult.evidence : [];
     try {
       await exportAnalysis(
         queryResult.query,
@@ -381,7 +384,7 @@ export const useDashboard = (): UseDashboardReturn => {
       console.error("Export failed:", err);
       notify("Export failed. Please retry.");
     }
-  }, [queryResult, insight, evidenceItems, exportFormat, includeEvidence, notify]);
+  }, [queryResult, insight, exportFormat, includeEvidence, notify]);
 
   const handleVerify = useCallback(async () => {
     if (!queryResult) return;
@@ -507,5 +510,7 @@ export const useDashboard = (): UseDashboardReturn => {
     retryInsight,
     refreshSignals,
     scrollRef,
+    setLoading,
+    setError,
   };
 };

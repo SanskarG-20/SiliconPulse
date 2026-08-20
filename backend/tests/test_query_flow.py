@@ -95,14 +95,22 @@ def test_query_alias_expansion():
 
 
 def test_generate_fallback_when_no_evidence():
-    with patch("app.routes.query.safe_read_jsonl") as mock_read:
+    with patch("app.routes.query.safe_read_jsonl") as mock_read, patch("app.routes.query.settings") as mock_settings:
         mock_read.return_value = []
-        resp = client.post("/api/generate", json={"query": "unknown query xyz", "context": ""})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "insight" in data
-        # fallback JSON contains Insufficient Live Signals
-        assert "Insufficient Live Signals" in data["insight"] or "insufficient" in data["insight"].lower()
+        mock_settings.gemini_api_key = "fake-key-for-test"
+        mock_settings.gemini_model = "gemini-1.5-flash"
+        # Need a valid path mock for the fallback branch that reads latest_events
+        from pathlib import Path
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            mock_settings.resolved_data_path = Path(td) / "stream.jsonl"
+            resp = client.post("/api/generate", json={"query": "unknown query xyz", "context": ""})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "insight" in data
+            # fallback JSON contains Insufficient Live Signals when API key is present but no evidence
+            assert "Insufficient Live Signals" in data["insight"] or "insufficient" in data["insight"].lower()
 
 
 def test_generate_with_evidence_calls_gemini():

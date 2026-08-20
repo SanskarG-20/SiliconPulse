@@ -65,6 +65,10 @@ const Dashboard: React.FC = () => {
     filteredEvidenceItems,
     isInsightUnavailable,
     filteredFeed,
+    backendOnline,
+    isWakingUp,
+    apiBaseUrl,
+    shouldWarnLocalhost,
     // Functions
     notify,
     handleSubmit,
@@ -77,6 +81,7 @@ const Dashboard: React.FC = () => {
     resetDashboard,
     retryInsight,
     refreshSignals,
+    waitForBackendAndRetry,
     scrollRef,
     setLoading,
     setError,
@@ -85,6 +90,23 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
       <BackgroundLayer />
+      {shouldWarnLocalhost && (
+        <div className="bg-amber-500/20 border-b border-amber-500/30 text-amber-200 text-[11px] font-bold text-center py-2 px-4 z-50">
+          ⚠️ Production is using localhost API ({apiBaseUrl}). Set <code className="bg-amber-500/20 px-1 rounded">VITE_API_BASE_URL=https://your-backend.onrender.com/api</code> in Vercel → Settings → Environment Variables → Redeploy.
+        </div>
+      )}
+      {!backendOnline && (
+        <div className="bg-red-500/10 border-b border-red-500/20 text-red-300 text-xs text-center py-2 px-4 z-50 flex items-center justify-center space-x-2">
+          <span>{isWakingUp ? "⏳ Backend is waking up (Render free tier, ~30s) — retrying..." : `🔴 Backend offline (tried ${apiBaseUrl})`}</span>
+          {!isWakingUp && (
+            <button onClick={async () => {
+              const ok = await waitForBackendAndRetry();
+              if (ok && lastSubmittedQuery) handleSubmit(lastSubmittedQuery);
+              else if (!ok) setError(`Backend still offline after retries (tried ${apiBaseUrl}). Check Render dashboard logs.`);
+            }} className="ml-2 px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 rounded text-[10px] font-black uppercase tracking-widest">Retry Now</button>
+          )}
+        </div>
+      )}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-lg border border-sky-500/30 bg-slate-950/95 text-sky-100 text-xs font-bold uppercase tracking-widest shadow-2xl">
           {toast}
@@ -188,14 +210,13 @@ const Dashboard: React.FC = () => {
               onSubmit={handleSubmit}
               onRetryInsight={retryInsight}
               onCheckBackend={async () => {
-                const { checkBackendHealth } = await import('../../api/siliconpulseApi');
-                const isOnline = await checkBackendHealth();
-                if (isOnline) {
-                  setLoading(false);
-                  if (lastSubmittedQuery) handleSubmit(lastSubmittedQuery);
-                } else {
-                  setLoading(false);
-                  setError("Backend still offline. Please ensure server is running on port 8000.");
+                setLoading(true);
+                const ok = await waitForBackendAndRetry();
+                setLoading(false);
+                if (ok && lastSubmittedQuery) {
+                  handleSubmit(lastSubmittedQuery);
+                } else if (!ok) {
+                  setError(`Backend still offline after retries (tried ${apiBaseUrl}). Render free tier needs 30-50s to wake. Check Render logs or set VITE_API_BASE_URL correctly.`);
                 }
               }}
               onDismissError={() => setError(null)}

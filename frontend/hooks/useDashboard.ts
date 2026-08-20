@@ -18,7 +18,11 @@ import {
   exportAnalysis, 
   verifySources, 
   setAuthTokenGetter, 
-  syncAuthenticatedUser 
+  syncAuthenticatedUser,
+  BASE_URL,
+  SHOULD_WARN_LOCALHOST_IN_PROD,
+  checkBackendHealth,
+  waitForBackend,
 } from '../api/siliconpulseApi';
 
 interface UseDashboardReturn {
@@ -75,6 +79,10 @@ interface UseDashboardReturn {
   filteredEvidenceItems: any[];
   isInsightUnavailable: boolean;
   filteredFeed: LiveEvent[];
+  backendOnline: boolean;
+  isWakingUp: boolean;
+  apiBaseUrl: string;
+  shouldWarnLocalhost: boolean;
   // Functions
   notify: (message: string) => void;
   handleSubmit: (e: React.FormEvent | string) => Promise<void>;
@@ -87,6 +95,7 @@ interface UseDashboardReturn {
   resetDashboard: () => void;
   retryInsight: () => void;
   refreshSignals: () => Promise<void>;
+  waitForBackendAndRetry: () => Promise<boolean>;
   scrollRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -135,6 +144,20 @@ export const useDashboard = (): UseDashboardReturn => {
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem('siliconpulse_theme') === 'light';
   });
+  const [backendOnline, setBackendOnline] = useState<boolean>(true);
+  const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
+
+  useEffect(() => {
+    console.log(`[SiliconPulse] API BASE_URL: ${BASE_URL}`);
+    if (SHOULD_WARN_LOCALHOST_IN_PROD) {
+      console.warn(`[SiliconPulse] VITE_API_BASE_URL points to localhost in production! Set VITE_API_BASE_URL=https://your-backend.onrender.com/api in Vercel env vars.`);
+    }
+    // Initial health probe
+    checkBackendHealth().then(ok => {
+      setBackendOnline(ok);
+      if (!ok) console.warn(`[SiliconPulse] Backend health check failed for ${BASE_URL}`);
+    });
+  }, []);
 
   useEffect(() => {
     if (isLightMode) {
@@ -196,6 +219,8 @@ export const useDashboard = (): UseDashboardReturn => {
 
   const processSignals = useCallback((signals: any[]) => {
     if (signals && signals.length > 0) {
+      setBackendOnline(true);
+      setIsWakingUp(false);
       const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => createLiveEvent(s, idx));
       const ordered = buildLiveFeed(mappedSignals, 10);
 
@@ -217,6 +242,8 @@ export const useDashboard = (): UseDashboardReturn => {
       return;
     }
 
+    // Empty signals but not error = backend online but no data yet
+    setBackendOnline(true);
     setLiveFeed(INITIAL_LIVE_FEED);
     const fallbackResult = generateRecommendationsFromFeed(
       INITIAL_LIVE_FEED,
@@ -233,25 +260,49 @@ export const useDashboard = (): UseDashboardReturn => {
       processSignals(signals);
     } catch (err) {
       console.error("Failed to refresh signals:", err);
+      setBackendOnline(false);
       notify("Live feed refresh failed. Showing cached signals.");
     }
   }, [notify, processSignals]);
 
-  // SWR: poll signals every 5s with deduping, stale-while-revalidate
-  const { data: swrSignals, mutate: mutateSignals } = useSWR('signals', fetchSignals, {
+  // SWR: poll signals every 5s with deduping, stale-while-revalidate (handles Render wake-up via retry)
+  const { data: swrSignals, error: swrError, mutate: mutateSignals } = useSWR('signals', fetchSignals, {
     refreshInterval: 5000,
     dedupingInterval: 4000,
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
     fallbackData: [],
+    shouldRetryOnError: true,
+    errorRetryInterval: 5000,
+    errorRetryCount: 3,
   });
 
   // Process SWR data when it changes
   useEffect(() => {
+    if (swrError) {
+      setBackendOnline(false);
+      if (SHOULD_WARN_LOCALHOST_IN_PROD) {
+        console.error(`Backend offline - localhost in prod: ${BASE_URL}`);
+      }
+    }
     if (swrSignals) {
       processSignals(swrSignals);
     }
-  }, [swrSignals, processSignals]);
+  }, [swrSignals, swrError, processSignals]);
+
+  const waitForBackendAndRetry = useCallback(async (): Promise<boolean> => {
+    setIsWakingUp(true);
+    const ok = await waitForBackend((attempt) => {
+      notify(`Backend waking up... retry ${attempt}/6`);
+    });
+    setIsWakingUp(false);
+    setBackendOnline(ok);
+    if (ok) {
+      notify("Backend online — retrying your request...");
+      mutateSignals();
+    }
+    return ok;
+  }, [notify, mutateSignals]);
 
   useEffect(() => {
     const init = async () => {
@@ -303,6 +354,8 @@ export const useDashboard = (): UseDashboardReturn => {
 
     try {
       const result = await querySiliconPulse(finalQuery.trim());
+      setBackendOnline(true);
+      setIsWakingUp(false);
       setQueryResult(result);
       setLoading(false);
 
@@ -319,7 +372,11 @@ export const useDashboard = (): UseDashboardReturn => {
       setQuery('');
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (err: any) {
-      setError(err.message || 'Intelligence failure. Connection to core reasoning lost.');
+      const msg = err.message || 'Intelligence failure. Connection to core reasoning lost.';
+      if (msg.includes('Backend offline') || msg.includes('tried')) {
+        setBackendOnline(false);
+      }
+      setError(msg);
       setLoading(false);
     }
   }, [query, loading]);
@@ -516,6 +573,10 @@ export const useDashboard = (): UseDashboardReturn => {
     filteredEvidenceItems,
     isInsightUnavailable,
     filteredFeed,
+    backendOnline,
+    isWakingUp,
+    apiBaseUrl: BASE_URL,
+    shouldWarnLocalhost: SHOULD_WARN_LOCALHOST_IN_PROD,
     // Functions
     notify,
     handleSubmit,
@@ -528,6 +589,7 @@ export const useDashboard = (): UseDashboardReturn => {
     resetDashboard,
     retryInsight,
     refreshSignals,
+    waitForBackendAndRetry,
     scrollRef,
     setLoading,
     setError,

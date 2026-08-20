@@ -1,7 +1,12 @@
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
-const DEFAULT_TIMEOUT_MS = 10000;
-const QUERY_TIMEOUT_MS = 12000;
-const INSIGHT_TIMEOUT_MS = 20000;
+export const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+export const IS_LOCALHOST_API = BASE_URL.includes("127.0.0.1") || BASE_URL.includes("localhost");
+export const IS_PROD = typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+export const SHOULD_WARN_LOCALHOST_IN_PROD = IS_PROD && IS_LOCALHOST_API;
+// Render free tier needs ~30s to wake up
+const DEFAULT_TIMEOUT_MS = 15000;
+const QUERY_TIMEOUT_MS = 20000;
+const INSIGHT_TIMEOUT_MS = 30000;
+const HEALTH_TIMEOUT_MS = 30000;
 
 type AuthTokenGetter = (() => Promise<string | null>) | null;
 let authTokenGetter: AuthTokenGetter = null;
@@ -75,25 +80,42 @@ const normalizeQueryResponse = (data: any, query: string): QueryResponse => ({
 
 const normalizeError = (error: any): Error => {
     if (error?.name === "AbortError") {
-        return new Error("Request timed out. Please retry once the backend catches up.");
+        if (SHOULD_WARN_LOCALHOST_IN_PROD) {
+            return new Error(`Backend timed out (tried ${BASE_URL}). You're in production but VITE_API_BASE_URL points to localhost. Set it to your Render URL in Vercel env vars.`);
+        }
+        return new Error(`Backend timed out (tried ${BASE_URL}). Render free tier may be waking up — retrying automatically.`);
     }
     if (error?.name === "TypeError" && error?.message === "Failed to fetch") {
-        return new Error("Backend offline. Please check connection.");
+        if (SHOULD_WARN_LOCALHOST_IN_PROD) {
+            return new Error(`Backend offline (tried ${BASE_URL}). VITE_API_BASE_URL is localhost in production. Set VITE_API_BASE_URL=https://your-backend.onrender.com/api in Vercel.`);
+        }
+        return new Error(`Backend offline (tried ${BASE_URL}). Render may be waking up (30-50s). Retrying automatically...`);
     }
-    return error instanceof Error ? error : new Error("Unexpected API failure.");
+    return error instanceof Error ? error : new Error(`Unexpected API failure (tried ${BASE_URL}).`);
 };
 
 export const checkBackendHealth = async (): Promise<boolean> => {
-    try {
-        const controller = new AbortController();
-        const healthUrl = `${BASE_URL.replace('/api', '')}/health`;
-        const response = await withTimeout(fetch(healthUrl, {
-            signal: controller.signal,
-        }), controller, 5000);
-        return response.ok;
-    } catch {
-        return false;
+    const healthUrl = `${BASE_URL.replace('/api', '')}/health`;
+    // Retry 3 times for Render wake-up (30s total)
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const controller = new AbortController();
+            const response = await withTimeout(fetch(healthUrl, { signal: controller.signal }), controller, HEALTH_TIMEOUT_MS);
+            if (response.ok) return true;
+        } catch {}
+        if (attempt < 2) await new Promise(r => setTimeout(r, 5000));
     }
+    return false;
+};
+
+export const waitForBackend = async (onRetry?: (attempt: number) => void): Promise<boolean> => {
+    for (let i = 0; i < 6; i++) {
+        const ok = await checkBackendHealth();
+        if (ok) return true;
+        onRetry?.(i + 1);
+        await new Promise(r => setTimeout(r, 5000));
+    }
+    return false;
 };
 
 export const bootstrapSystem = async (): Promise<any> => {

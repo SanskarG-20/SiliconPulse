@@ -21,11 +21,14 @@ Unlike static dashboards, SiliconPulse is **reactive and intent-aware**. It unde
 ## ✨ Key Features
 
 - 📡 **Live Pulse Feed & Ingestion**: A real-time data pipeline that ingests, normalizes, and deduplicates signals on the fly with a 12-hour freshness window.
-- 🧠 **Strategic Insight Engine (RAG)**: Powered by Gemini, generating structured reports outlining Immediate Shifts, Impact Reasoning, Competitor Effects, and Strategic Outlooks.
+- 🧠 **Strategic Insight Engine (RAG)**: Powered by Gemini (google-genai 1.30), generating structured reports outlining Immediate Shifts, Impact Reasoning, Competitor Effects, and Strategic Outlooks.
 - 🎯 **Universal Company Radar**: Dynamically extracts organizations using robust regex/NLP heuristics to track the pulse of every startup, tech giant, and entity mentioned in the stream—unbound by static dictionaries.
 - 💉 **Live Signal Injection**: Manually inject custom intelligence into the live stream and watch the AI instantly adapt its analysis and confidence scoring.
 - ✅ **Source Verification & End-to-End Export**: Automated trust-scoring for sources (High/Medium/Low) with justification. Export full intelligence briefings to Markdown, JSON, or Text.
 - 🎬 **Cinematic Command Center UI**: High-fidelity React interface featuring atmospheric styling and real-time interactive components.
+- 🕸️ **Graph RAG (Supply-Chain)**: In-memory knowledge graph (ASML→TSMC→NVIDIA→Microsoft) with BFS impact/supplier scoring, wired into LLM prompt for deeper reasoning.
+- 📊 **Observability**: Detailed `/health` + `/metrics` (uptime, request/error counts, stream size, dedup), rate-limiting (slowapi), structured logging.
+- ⚡ **SWR Polling**: Frontend uses `swr` stale-while-revalidate (5s poll, 4s dedup) instead of raw `setInterval`.
 
 ---
 
@@ -44,13 +47,17 @@ graph TD
     subgraph "Backend (FastAPI)"
         API[API Gateway] --> QueryEngine
         API --> RadarService
+        API --> Graph[Graph RAG Store]
+        API --> Metrics[/health + /metrics]
         QueryEngine -->|Retrieve| ProcessedStream
-        QueryEngine -->|Synthesize| LLM[Google Gemini 1.5]
+        QueryEngine -->|Enrich| Graph
+        QueryEngine -->|Synthesize| LLM[Google Gemini 2.0/2.5]
     end
 
     subgraph "Frontend (React + Vite)"
-        UI[Dashboard] -->|Poll Signals| API
+        UI[Dashboard] -->|SWR Poll 5s| API
         UI -->|Query Insights| QueryEngine
+        UI -->|GraphPanel| Graph
     end
 ```
 
@@ -58,6 +65,11 @@ graph TD
 - **Normalization**: Cleanses unstructured text for downstream RAG.
 - **Deduplication**: Computes stable SHA-256 fingerprints for events to ensure distinct processing.
 - **Universal Entity Extraction**: Employs real-time heuristics to auto-tag organizations across the tech spectrum.
+
+### Graph RAG Store
+- 19 static edges (ASML→TSMC→NVIDIA→Microsoft, etc.) with weights
+- BFS `get_impact` / `get_suppliers` up to depth 3, score = product of weights
+- Endpoints: `/api/graph/nodes`, `/edges`, `/impact/{co}`, `/suppliers/{co}`, `/explain/{co}` — wired into `/generate` prompt as “GRAPH CONTEXT”.
 
 ---
 
@@ -148,40 +160,75 @@ npm run dev
 
 > **Note**: On Windows, set `USE_PATHWAY=False` in `.env` (default). The scheduler handles data ingestion every 5 minutes. On Linux/WSL, set `USE_PATHWAY=True` for real-time streaming.
 
+### Docker (Production)
+
+```bash
+cp .env.example .env  # fill keys
+docker compose up --build
+# Frontend: http://localhost:3000  (nginx proxies /api → backend:8000)
+# Backend:  http://localhost:8000  (health, metrics, docs at /docs)
+```
+
+- Multi-stage builds: `backend` (python:3.11-slim), `frontend` (node:20 → nginx:alpine)
+- Volumes: `./backend/data` persisted for stream + SQLite
+
+### API Highlights
+
+- `POST /api/query` (30/min) — retrieve top-k evidence, signal_strength, confidence
+- `POST /api/generate` (10/min) — Gemini report with Graph RAG enrichment
+- `POST /api/inject` (10/min) — manual signal, dedup via SQLite
+- `GET /api/graph/impact/{co}?depth=2` — downstream score BFS
+- `GET /api/graph/explain/{co}` — LLM-ready context
+- `GET /health` — detailed checks (DB, stream size, gemini)
+- `GET /metrics` — uptime, requests_total, errors_total, dedup count
+
 ---
 
 ## 🧪 Testing & Verification
 
-Run the automated smoke tests to ensure your backend environment and RAG integrations are functioning correctly:
+Run the automated tests (smoke + query-flow + graph + docker):
 
 ```bash
 cd backend
 export PYTHONPATH="."  # On Windows: $env:PYTHONPATH="."
-pytest tests/test_smoke.py
+pytest tests/ -v -k "smoke or query or graph"
+# + frontend
+cd ../frontend
+npm run build        # vite + tsc check
+npx eslint .         # lint
+npm run e2e          # Playwright (needs backend + frontend running)
+# or via compose:
+docker compose up --build -d && curl http://localhost:8000/health && curl http://localhost:8000/metrics
 ```
 
 Check backend health:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/health | jq
+curl http://localhost:8000/metrics | jq
+curl http://localhost:8000/api/graph/explain/TSMC | jq
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Framer Motion
-- **Backend**: FastAPI, Uvicorn, APScheduler, Python `re` (Heuristics)
-- **Data Processing**: Pathway
-- **AI / LLM**: Google Gemini (1.5 Flash / Pro)
-- **Storage**: JSONL (Streaming), SQLite (Metadata)
+- **Frontend**: React 19, Vite 6, Tailwind, Lucide, SWR (polling), Playwright (E2E), nginx (prod)
+- **Backend**: FastAPI 0.115, Uvicorn, APScheduler, slowapi (rate-limit), lifespan, `re` heuristics
+- **Data Processing**: Pathway (Linux) / Polling fallback (Windows)
+- **AI / LLM**: Google Gemini 2.0/2.5 via `google-genai` 1.30 (fallback `google-generativeai`)
+- **Storage**: JSONL (Streaming), SQLite (Metadata + dedup)
+- **Graph**: In-memory supply-chain DAG (BFS scored)
+- **Observability**: `/health` + `/metrics`, structured logging, Grafana-ready
 
 ---
 
 ## 🔮 Roadmap
 
-- [ ] **Graph RAG**: Map multi-tiered supply chain dependencies (e.g., ASML -> TSMC -> NVIDIA) for deep-tier impact analysis.
+- [x] **Graph RAG**: Map multi-tiered supply chain dependencies (ASML→TSMC→NVIDIA) — POC done (`/api/graph/*`, prompt enrichment)
 - [ ] **Multi-Modal Ingestion**: Parse PDF earnings reports and financial charts automatically.
 - [ ] **Distributed Streaming**: Scale to multiple Pathway workers to support 1M+ event ingestion per day.
+- [ ] **Frontend Graph Viz**: D3 force-graph for live supply-chain explorer
+- [ ] **PDF Vision**: `google-genai` vision for chart extraction
 
 ---
 

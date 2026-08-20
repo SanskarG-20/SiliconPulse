@@ -1,51 +1,49 @@
 import os
+import platform
 from pathlib import Path
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
-
-# Load environment variables from .env file
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     app_name: str = "SiliconPulse API"
-    clerk_issuer: str = os.getenv("CLERK_ISSUER", "")
-    clerk_audience: str = os.getenv("CLERK_AUDIENCE", "")
-    supabase_url: str = os.getenv("SUPABASE_URL", "")
-    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    clerk_issuer: str = ""
+    clerk_audience: str = ""
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-1.5-flash"
     gemini_fallback_models: list[str] = ["gemini-1.5-pro", "gemini-1.0-pro"]
-    data_stream_path: str = os.getenv("DATA_STREAM_PATH", "data/stream.jsonl")
-    host: str = os.getenv("HOST", "0.0.0.0")
-    port: int = int(os.getenv("PORT", "8000"))
+    data_stream_path: str = "data/stream.jsonl"
+    host: str = "0.0.0.0"
+    port: int = 8000
     
     # Deduplication & Freshness Settings
-    freshness_hours: int = int(os.getenv("FRESHNESS_HOURS", "12"))
-    max_events_to_scan: int = int(os.getenv("MAX_EVENTS_TO_SCAN", "500"))
-    dedup_enabled: bool = os.getenv("DEDUP_ENABLED", "true").lower() == "true"
-    checkpoint_enabled: bool = os.getenv("CHECKPOINT_ENABLED", "true").lower() == "true"
-    db_path: str = os.getenv("DB_PATH", "data/siliconpulse.db")
+    freshness_hours: int = 12
+    max_events_to_scan: int = 500
+    dedup_enabled: bool = True
+    checkpoint_enabled: bool = True
+    db_path: str = "data/siliconpulse.db"
     
-    # Pathway Settings
-    use_pathway: bool = os.getenv("USE_PATHWAY", "True").lower() == "true"
-    pathway_output_path: str = os.getenv("PATHWAY_OUTPUT_PATH", "data/pathway_out.jsonl")
+    # Pathway Settings - Default False on Windows since Pathway doesn't run natively
+    use_pathway: bool = platform.system() != "Windows"
+    pathway_output_path: str = "data/pathway_out.jsonl"
     
     # GDELT Settings (free API)
-    gdelt_enabled: bool = os.getenv("GDELT_ENABLED", "True").lower() == "true"
+    gdelt_enabled: bool = True
     
     # HackerNews Settings (free Algolia API)
-    hackernews_enabled: bool = os.getenv("HACKERNEWS_ENABLED", "True").lower() == "true"
+    hackernews_enabled: bool = True
 
     # External news providers (free APIs)
-    newsapi_api_key: str = os.getenv("NEWSAPI_API_KEY", "")
+    newsapi_api_key: str = ""
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file = ".env",
+        env_file_encoding = "utf-8",
+        case_sensitive = False,
         extra = "ignore"
+    )
 
     @property
     def resolved_data_path(self) -> Path:

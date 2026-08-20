@@ -117,9 +117,9 @@ def update_checkpoint(source: str, checkpoint: str) -> None:
         now = datetime.utcnow().isoformat() + "Z"
         cursor.execute(
             """
-            INSERT INTO source_checkpoints (source, last_checkpoint, last_pull_ts) 
+            INSERT INTO source_checkpoints (source, last_checkpoint, last_pull_ts)
             VALUES (?, ?, ?)
-            ON CONFLICT(source) DO UPDATE SET 
+            ON CONFLICT(source) DO UPDATE SET
                 last_checkpoint = excluded.last_checkpoint,
                 last_pull_ts = excluded.last_pull_ts
             """,

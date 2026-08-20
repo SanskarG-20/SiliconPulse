@@ -100,8 +100,8 @@ def test_generate_fallback_when_no_evidence():
         mock_settings.gemini_api_key = "fake-key-for-test"
         mock_settings.gemini_model = "gemini-1.5-flash"
         # Need a valid path mock for the fallback branch that reads latest_events
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as td:
             mock_settings.resolved_data_path = Path(td) / "stream.jsonl"

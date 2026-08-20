@@ -26,15 +26,6 @@ def map_company_from_text(text: str) -> str:
     return company if company else "Unknown"
 
 
-def classify_event_type(title: str, content: str) -> str:
-    """
-    Classify event type using centralized utility.
-    Returns snake_case event type.
-    """
-    from ..utils import classify_event_type as _classify
-    return _classify(title, content)
-
-
 def pull_hn_signals(max_stories: int = 100) -> int:
     """
     Fetch signals from HackerNews using Algolia API.

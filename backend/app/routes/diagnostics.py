@@ -10,7 +10,7 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 async def user_diagnostics(user=Depends(get_current_user)):
     """Returns the latest user data stored in Supabase."""
     user_id = user.get("user_id")
-    user_email = user.get("email")
+    user.get("email")
 
     if not user_id:
         return {

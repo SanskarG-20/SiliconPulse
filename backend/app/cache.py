@@ -55,7 +55,7 @@ class EventCache:
                             event_time = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
                             if event_time.replace(tzinfo=None) < cutoff_time:
                                 continue
-                        except:
+                        except Exception:
                             pass
 
                     events.append(event)

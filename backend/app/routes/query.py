@@ -329,14 +329,14 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
             return GenerateResponse(insight=fallback_json)
 
         prompt = f"""
-        You are SiliconPulse, an advanced strategic intelligence engine. 
+        You are SiliconPulse, an advanced strategic intelligence engine.
         Generate a high-precision intelligence report based on the provided context.
-        
+
         QUERY: {body.query}
-        
+
         CONTEXT:
         {body.context}
-        
+
         INSTRUCTIONS:
         - Analyze the provided evidence carefully.
         - Output strictly valid JSON. Do not include markdown formatting (like ```json).
@@ -344,7 +344,7 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
         - If evidence is low, focus on "What we know" vs "What we don't know".
         - Include uncertainties and monitoring suggestions in the "outlook" section.
         - Ensure the "confidence" section reflects the limited data (e.g., "Low" or "Medium").
-        
+
         JSON SCHEMA:
         {{
           "sections": [

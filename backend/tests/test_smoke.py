@@ -46,7 +46,7 @@ def test_scheduler_trigger(mock_hn, mock_news, mock_gdelt):
         success = False
         print(f"Scheduler update failed: {e}")
 
-    assert success == True
+    assert success
     mock_hn.assert_called_once()
     mock_news.assert_called_once()
     mock_gdelt.assert_called_once()

@@ -1,7 +1,7 @@
+import logging
 import random
 from datetime import datetime
 
-import logging
 from fastapi import APIRouter, Depends
 
 from ..core.auth import get_current_user

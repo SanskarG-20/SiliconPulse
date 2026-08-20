@@ -56,7 +56,7 @@ def get_supabase_client() -> Any | None:
 
 def ensure_user(user_id: str, email: str | None = None) -> bool:
     """
-    Ensure user exists in Supabase. 
+    Ensure user exists in Supabase.
     Creates user if not exists, updates email if provided.
     Returns True if successful, False otherwise.
     """

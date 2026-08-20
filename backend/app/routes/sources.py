@@ -3,10 +3,9 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..core.limiter import limiter
-
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
+from ..core.limiter import limiter
 from ..models import SourceVerifyItem, SourceVerifyResponse
 from ..services.news_sources import async_pull_newsapi, ingest_news_stream
 from ..settings import settings
@@ -25,7 +24,7 @@ async def pull_newsapi_endpoint(request: Request):
         count = await async_pull_newsapi()
         return {"status": "ok", "source": "NewsAPI", "pulled": count, "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/pull_all")
@@ -48,7 +47,7 @@ async def pull_all_sources(request: Request):
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/verify", response_model=SourceVerifyResponse)

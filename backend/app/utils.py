@@ -98,7 +98,6 @@ _EVENT_TYPE_KEYWORDS = {
     "acquisition": "m_and_a",
     "acqu": "m_and_a",
     "bought": "m_and_a",
-    "deal": "m_and_a",
     "merger": "m_and_a",
     # Contract/Partnership
     "contract": "contract",
@@ -356,7 +355,7 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = 
 def compute_confidence(evidence: list) -> dict:
     """
     Compute dynamic confidence score (0-100), label, and reason.
-    
+
     Rules:
     - Evidence Count: >=6 (+50), 3-5 (+30), 1-2 (+15), 0 (+0)
     - Recency: Latest evidence < 2h (+25), < 12h (+15), else (+5)

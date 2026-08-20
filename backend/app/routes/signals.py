@@ -1,6 +1,6 @@
+import logging
 from datetime import datetime
 
-import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core.auth import get_current_user
@@ -86,17 +86,8 @@ async def inject_signal(request: Request, body: InjectRequest, user=Depends(get_
         )
 
     except PermissionError as e:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Permission denied when writing to {settings.data_stream_path}: {str(e)}"
-        )
+        raise HTTPException(status_code=403, detail=f"Permission denied when writing to {settings.data_stream_path}: {str(e)}") from e
     except OSError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"File system error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"File system error: {str(e)}") from e
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to inject data: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to inject data: {str(e)}") from e

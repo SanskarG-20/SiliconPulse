@@ -82,4 +82,4 @@ async def export_analysis(request: ExportRequest):
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Export failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

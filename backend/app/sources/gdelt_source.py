@@ -28,15 +28,6 @@ def map_company_from_text(text: str) -> str:
     return company if company else "Unknown"
 
 
-def classify_event_type(title: str, content: str) -> str:
-    """
-    Classify event type using centralized utility.
-    Returns snake_case event type.
-    """
-    from ..utils import classify_event_type as _classify
-    return _classify(title, content)
-
-
 def pull_gdelt_signals(max_articles: int = 50) -> int:
     """
     Fetch signals from GDELT API for tech/semiconductor companies.

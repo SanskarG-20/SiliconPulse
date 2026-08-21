@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from ..core.auth import get_current_user
 from ..core.limiter import limiter
 from ..settings import settings
-from ..utils import safe_read_jsonl
 from .store import get_edges, get_impact, get_nodes, get_suppliers, simulate_scenario
 
 router = APIRouter(dependencies=[Depends(get_current_user)])

@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 """
 Simple in-memory supply-chain graph for Graph RAG POC.
 Nodes = companies, Edges = dependency with type and weight.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

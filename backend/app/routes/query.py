@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
 from ..core.limiter import limiter
+from ..graph.store import get_impact, get_suppliers
 from ..models import (
     EvidenceItem,
     GenerateRequest,
@@ -17,7 +18,6 @@ from ..models import (
     QueryResponse,
     RadarStatus,
 )
-from ..graph.store import get_impact, get_suppliers
 from ..query_cache import query_cache
 from ..services.gemini_client import gemini_client
 from ..settings import settings
@@ -347,11 +347,11 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
         graph_context = "\n".join(graph_parts) if graph_parts else "No supply-chain graph data for query."
 
         prompt = f"""
-        You are SiliconPulse, an advanced strategic intelligence engine. 
+        You are SiliconPulse, an advanced strategic intelligence engine.
         Generate a high-precision intelligence report based on the provided context.
-        
+
         QUERY: {body.query}
-        
+
         CONTEXT:
         {body.context}
 

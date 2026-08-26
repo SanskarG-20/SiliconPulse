@@ -108,6 +108,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include API routes with /api prefix
 app.include_router(router, prefix="/api", tags=["api"])
+
+# WebSocket routes (mounted at /api, so endpoint = /api/ws/signals)
+from .ws import router as ws_router  # noqa: E402
+
+app.include_router(ws_router, prefix="/api", tags=["ws"])
+
+
 @app.get("/")
 async def root():
     return {"message": "SiliconPulse backend running"}

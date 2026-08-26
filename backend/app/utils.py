@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -262,6 +263,7 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
     """
     Append new events to the file only if they don't already exist in SQLite store.
     Returns the number of new events added.
+    Also enqueues embeddings for the vector store (best-effort, async).
     """
     if not new_events:
         return 0
@@ -288,7 +290,43 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
                 json.dump(event, f, ensure_ascii=False)
                 f.write("\n")
 
+        # Best-effort async embedding + vector upsert
+        try:
+            import asyncio
 
+            from .services.vector_store import is_available
+
+            if is_available():
+                texts = [
+                    f"{e.get('title','')}. {e.get('content') or e.get('snippet','')}"[:2000]
+                    for e in events_to_write
+                ]
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(_embed_and_store(events_to_write, texts))
+                except RuntimeError:
+                    # no running loop (sync context like scheduler thread)
+                    threading.Thread(
+                        target=lambda: asyncio.run(_embed_and_store(events_to_write, texts)),
+                        daemon=True,
+                    ).start()
+        except Exception as e:
+            logger.debug(f"Vector indexing skipped: {e}")
+
+    return added_count
+
+
+async def _embed_and_store(events: list[dict], texts: list[str]) -> None:
+    try:
+        from .services.embedding_service import embed_texts
+        from .services.vector_store import upsert_signals
+
+        embs = await embed_texts(texts)
+        if any(embs):
+            n = upsert_signals(events, embs)
+            logger.info(f"Vector indexed {n} new signals")
+    except Exception as e:
+        logger.debug(f"Embed/store failed: {e}")
 
 def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = None) -> list[dict]:
     """

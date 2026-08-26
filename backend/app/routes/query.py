@@ -19,7 +19,10 @@ from ..models import (
     RadarStatus,
 )
 from ..query_cache import query_cache
+from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
+from ..services.vector_store import is_available as vector_available
+from ..services.vector_store import query_similar
 from ..settings import settings
 from ..supabase_client import ensure_user, insert_insight_record, insert_query_record
 from ..utils import compute_confidence, extract_companies, safe_read_jsonl
@@ -89,6 +92,23 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
             freshness_hours=settings.freshness_hours
         )
 
+        # ---- STAGE A: Vector semantic search (if available) ----
+        vector_hits: dict[str, float] = {}  # title -> similarity
+        use_vector = vector_available() and bool(events)
+        if use_vector:
+            try:
+                q_emb = await embed_text(body.query)
+                if q_emb:
+                    similar = query_similar(q_emb, k=min(30, len(events) * 2))
+                    for hit in similar:
+                        t = hit.get("title", "")
+                        if t:
+                            vector_hits[t] = float(hit.get("similarity", 0.0))
+                    logger.info(f"[{request_id}] Vector hits: {len(vector_hits)}")
+            except Exception as ve:
+                logger.warning(f"[{request_id}] Vector search failed: {ve}")
+
+        # ---- STAGE B: Keyword matching (alias-expanded) ----
         matched_events = []
 
         raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
@@ -122,6 +142,17 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
 
             if match_count > 0:
                 matched_events.append(event)
+
+        # ---- STAGE C: Merge vector hits not caught by keywords ----
+        if vector_hits:
+            seen_titles_kw = {e.get("title") for e in matched_events}
+            for event in events:
+                t = event.get("title", "")
+                if t in vector_hits and t not in seen_titles_kw:
+                    sim = vector_hits[t]
+                    if sim >= 0.72:  # semantic threshold
+                        matched_events.append(event)
+            logger.info(f"[{request_id}] Hybrid merge: {len(matched_events)} total (vector added {len(matched_events) - len(seen_titles_kw & set(vector_hits))})")
 
         seen = set()
         unique_matched = []

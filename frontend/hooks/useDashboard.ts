@@ -6,6 +6,7 @@ import { INITIAL_LIVE_FEED } from '../constants';
 import { buildLiveFeed, createLiveEvent, getRelativeTimeLabel, rotateFeed } from '../utils/feedUtils';
 import { generateRecommendationsFromFeed } from '../utils/recommendationUtils';
 import { resolveTrustLevel } from '../utils/sourceMapping';
+import { useSignalsWS, WSStatus } from './useSignalsWS';
 import { 
   querySiliconPulse, 
   injectSignal, 
@@ -96,6 +97,7 @@ interface UseDashboardReturn {
   retryInsight: () => void;
   refreshSignals: () => Promise<void>;
   waitForBackendAndRetry: () => Promise<boolean>;
+  wsStatus: WSStatus;
   scrollRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -265,9 +267,19 @@ export const useDashboard = (): UseDashboardReturn => {
     }
   }, [notify, processSignals]);
 
-  // SWR: poll signals every 5s with deduping, stale-while-revalidate (handles Render wake-up via retry)
+  // WebSocket live feed state (declared before SWR so refreshInterval can read it)
+  const wsStatusRef = useRef<WSStatus>('closed');
+  const handleWSStatus = useCallback((s: WSStatus) => {
+    wsStatusRef.current = s;
+    setWsStatus(s);
+    if (s === 'open') setBackendOnline(true);
+  }, []);
+  const [wsStatus, setWsStatus] = useState<WSStatus>('closed');
+  const [wsToken, setWsToken] = useState<string | null>(null);
+
+  // SWR: poll signals (paused when WS live; fallback when WS closed/error)
   const { data: swrSignals, error: swrError, mutate: mutateSignals } = useSWR('signals', fetchSignals, {
-    refreshInterval: 5000,
+    refreshInterval: (wsStatus === 'open') ? 0 : 5000,
     dedupingInterval: 4000,
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
@@ -289,6 +301,27 @@ export const useDashboard = (): UseDashboardReturn => {
       processSignals(swrSignals);
     }
   }, [swrSignals, swrError, processSignals]);
+
+  // Refresh WS auth token periodically (Clerk tokens expire ~60s)
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const t = await getToken();
+        if (!cancelled) setWsToken(t);
+      } catch { /* ignore */ }
+    };
+    refresh();
+    const iv = window.setInterval(refresh, 45000);
+    return () => { cancelled = true; window.clearInterval(iv); };
+  }, [getToken]);
+
+  useSignalsWS({
+    token: wsToken,
+    enabled: true,
+    onSignals: processSignals,
+    onStatusChange: handleWSStatus,
+  });
 
   const waitForBackendAndRetry = useCallback(async (): Promise<boolean> => {
     setIsWakingUp(true);
@@ -590,6 +623,7 @@ export const useDashboard = (): UseDashboardReturn => {
     retryInsight,
     refreshSignals,
     waitForBackendAndRetry,
+    wsStatus,
     scrollRef,
     setLoading,
     setError,

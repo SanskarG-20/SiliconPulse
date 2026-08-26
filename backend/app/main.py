@@ -135,6 +135,16 @@ async def health():
         checks["stream_file"] = f"error: {e}"
     # Gemini check
     checks["gemini_configured"] = bool(settings.gemini_api_key)
+    # Vector store check
+    try:
+        from .services.vector_store import count as vector_count
+        from .services.vector_store import is_available
+        if is_available():
+            checks["vector_store"] = f"ok ({vector_count()} vectors)"
+        else:
+            checks["vector_store"] = "unavailable (semantic search disabled)"
+    except Exception as e:
+        checks["vector_store"] = f"error: {e}"
     # Overall
     overall = "online" if checks["database"] == "ok" else "degraded"
     return {"status": overall, "service": "siliconpulse-backend", "checks": checks, "uptime_seconds": int(time.time() - START_TIME)}
@@ -154,11 +164,23 @@ async def metrics():
         seen_count = row[0] if row else 0
     except Exception:
         seen_count = -1
+    # Vector stats
+    try:
+        from .services.embedding_service import cache_size as embed_cache_size
+        from .services.vector_store import count as vector_count
+        from .services.vector_store import is_available
+        vector_count_val = vector_count() if is_available() else -1
+        embed_cache = embed_cache_size()
+    except Exception:
+        vector_count_val = -1
+        embed_cache = -1
     return {
         "uptime_seconds": uptime,
         "requests_total": REQUEST_COUNT,
         "errors_total": ERROR_COUNT,
         "stream_file_bytes": stream_size,
         "dedup_seen_events": seen_count,
+        "vector_signals": vector_count_val,
+        "embedding_cache_entries": embed_cache,
         "timestamp": now_ts(),
     }

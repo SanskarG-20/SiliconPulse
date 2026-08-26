@@ -208,6 +208,21 @@ curl http://localhost:8000/metrics | jq
 curl http://localhost:8000/api/graph/explain/TSMC | jq
 ```
 
+### Keep-Alive (Render free tier)
+
+Render free services spin down after 15 min idle → 30-50s cold start on next request. Prevent it with a free UptimeRobot monitor:
+
+1. Sign up at [uptimerobot.com](https://uptimerobot.com) (free, 50 monitors / 5-min interval)
+2. **Add New Monitor**:
+   - Type: `HTTP(s)`
+   - URL: `https://YOUR-BACKEND.onrender.com/ping`  *(ultra-light, no DB/vector checks)*
+   - Interval: `5 minutes` (free tier minimum)
+3. Save. Your backend now never sleeps.
+
+> Alternative: [cron-job.org](https://cron-job.org) (free) hitting `/ping` every 10 min. Render paid plans ($7/mo) don't need this.
+
+**Endpoints:** `/ping` (keep-alive, ~1ms) · `/health` (full checks: DB, stream, gemini, vector) · `/metrics` (uptime, requests, vector count)
+
 ---
 
 ## 🛠️ Tech Stack

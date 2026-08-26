@@ -150,6 +150,16 @@ async def health():
     return {"status": overall, "service": "siliconpulse-backend", "checks": checks, "uptime_seconds": int(time.time() - START_TIME)}
 
 
+@app.get("/ping")
+async def ping():
+    """
+    Ultra-light keep-alive endpoint for UptimeRobot / external cron.
+    No DB / file / vector checks — just proves the process is alive.
+    Pinging this every <15min prevents Render free tier spin-down.
+    """
+    return {"ok": True, "t": int(time.time())}
+
+
 @app.get("/metrics")
 async def metrics():
     uptime = int(time.time() - START_TIME)

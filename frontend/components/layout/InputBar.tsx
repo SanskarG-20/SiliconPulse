@@ -11,62 +11,48 @@ interface InputBarProps {
   activeCount: number;
 }
 
-export const InputBar: React.FC<InputBarProps> = ({
-  query,
-  onQueryChange,
-  onSubmit,
-  loading,
-  lastUpdate,
-  activeCount,
-}) => {
+export const InputBar: React.FC<InputBarProps> = ({ query, onQueryChange, onSubmit, loading, lastUpdate, activeCount }) => {
   return (
-    <div className="p-4 md:p-8 bg-slate-950/60 backdrop-blur-2xl border-t border-slate-800/60 relative z-40">
-      <div className="max-w-4xl mx-auto space-y-3 md:space-y-4">
+    <div className="p-3 md:p-4 bg-[#050B1A]/80 backdrop-blur-xl border-t border-[#1C3553]/50">
+      <div className="max-w-[760px] mx-auto space-y-2.5">
         <form onSubmit={onSubmit} className="relative group">
-          <div className="absolute inset-0 -m-[1px] bg-gradient-to-r from-sky-500/40 via-indigo-500/40 to-sky-500/40 rounded-2xl opacity-0 group-focus-within:opacity-100 blur-[6px] transition-all duration-500"></div>
-          <div className="relative flex items-center bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden px-4 md:px-5 focus-within:border-sky-500/50 shadow-2xl transition-all">
-            <Search className="text-slate-500 mr-3 md:mr-4 hidden sm:block" size={20} />
+          <div className="absolute -inset-[1px] rounded-[16px] bg-gradient-to-r from-[#22D3EE]/0 via-[#22D3EE]/20 to-[#E8A253]/20 opacity-0 group-focus-within:opacity-100 blur-[8px] transition-opacity duration-300 pointer-events-none" />
+          <div className="relative flex items-center gap-2 bg-[#0E1E32] border border-[#1C3553] rounded-[16px] px-3 md:px-4 py-2 shadow-[0_8px_24px_rgba(2,8,23,0.4)] focus-within:border-[#22D3EE]/40 focus-within:shadow-[0_0_0_3px_rgba(34,211,238,0.12)] transition-all">
+            <Search className="text-[#475569] hidden sm:block shrink-0" size={16} />
             <input
               type="text"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
-              placeholder="ENTER COMMAND OR QUERY..."
-              className="flex-1 py-4 md:py-5 bg-transparent outline-none text-slate-100 placeholder-slate-600 font-mono text-xs md:text-sm tracking-tight"
+              placeholder="Ask about yield, supply, or a company…"
+              className="flex-1 min-w-0 py-2.5 bg-transparent outline-none text-[13.5px] text-[#F1F5F9] placeholder:text-[#475569] placeholder:mono placeholder:text-[12px] placeholder:tracking-[0.02em]"
               disabled={loading}
+              aria-label="Query"
             />
-            <div className="flex items-center space-x-2 md:space-x-4">
-              <div className="hidden md:flex items-center space-x-2 px-2 py-1 bg-slate-800/50 rounded-md border border-slate-700/50">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">ENTER</span>
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !query.trim()}
-                className={`p-2.5 md:p-3 rounded-xl transition-all ${loading || !query.trim()
-                  ? 'text-slate-600 bg-slate-800/50'
-                  : 'text-white bg-sky-600 hover:bg-sky-500 shadow-[0_0_20px_rgba(14,165,233,0.4)] active:scale-95'
-                  }`}
-              >
-                <Search size={20} />
-              </button>
-            </div>
+            <span className="hidden md:inline-flex items-center mono text-[10px] tracking-[0.08em] text-[#475569] border border-[#1C3553] rounded-full px-2 py-1 bg-[#050B1A]">ENTER</span>
+            <button
+              type="submit"
+              disabled={loading || !query.trim()}
+              className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${loading || !query.trim() ? 'bg-[#1C3553] text-[#475569]' : 'bg-[#E8A253] text-[#050B1A] hover:bg-[#F0A85E] shadow-[0_0_14px_rgba(232,162,83,0.32)] active:scale-95'}`}
+              aria-label="Submit query"
+            >
+              <Search size={16} />
+            </button>
           </div>
         </form>
 
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center space-x-4 md:space-x-6">
-            <div className="flex items-center space-x-1.5 md:space-x-2">
-              <Clock size={10} className="text-slate-500" />
-              <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Freshness: <span className="text-sky-500">{lastUpdate}</span></span>
-            </div>
-            <div className="flex items-center space-x-1.5 md:space-x-2">
-              <TrendingUp size={10} className="text-emerald-500" />
-              <span className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Active: <span className="text-emerald-500">{activeCount}</span></span>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center space-x-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-            <span className="text-sky-500/60 font-mono">GEMINI_ACTIVE</span>
+        <div className="flex items-center justify-between px-1 mono text-[10px] tracking-[0.08em]">
+          <span className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+              <Clock size={11} /> FRESH <span className="text-[#22D3EE]">{lastUpdate}</span>
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[#64748B]">
+              <TrendingUp size={11} className="text-emerald-400" /> ACTIVE <span className="text-emerald-400">{activeCount}</span>
+            </span>
+          </span>
+          <span className="hidden sm:flex items-center gap-2 text-[#475569]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> GEMINI ACTIVE
             <UserButton afterSignOutUrl="/sign-in" />
-          </div>
+          </span>
         </div>
       </div>
     </div>

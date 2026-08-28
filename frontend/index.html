@@ -3,75 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SiliconPulse Live Intelligence</title>
+    <title>SiliconPulse — Signal-First Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body, #root {
-            width: 100%;
-            height: 100%;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { width: 100%; height: 100%; }
         :root {
-            --bg-main: #020617;
-            --bg-card: rgba(15, 23, 42, 0.6);
-            --border-subtle: rgba(51, 65, 85, 0.4);
-            --neon-sky: #38bdf8;
+            --void: #050B1A;
+            --panel: #0E1E32;
+            --panel-soft: rgba(14,30,50,0.72);
+            --hairline: #1C3553;
+            --hairline-soft: rgba(28,53,83,0.5);
+            --euv: #22D3EE;
+            --euv-soft: rgba(34,211,238,0.12);
+            --copper: #E8A253;
+            --copper-soft: rgba(232,162,83,0.14);
+            --signal: #F1F5F9;
+            --muted: #94A3B8;
+            --grid: rgba(34,211,238,0.06);
+            --radius: 16px;
         }
+        html { scrollbar-width: thin; scrollbar-color: #1E3A5F transparent; }
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-main);
-            color: #f8fafc;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--void);
+            color: var(--signal);
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
+        /* Type scale */
+        .display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        .glass { 
-            background: var(--bg-card); 
-            backdrop-filter: blur(12px); 
-            border: 1px solid var(--border-subtle); 
+        .serif { font-family: 'Newsreader', serif; }
+        /* Glass / panel */
+        .glass {
+            background: var(--panel-soft);
+            backdrop-filter: blur(14px) saturate(1.1);
+            border: 1px solid var(--hairline-soft);
         }
+        .glass-hover { transition: border-color 200ms, background 200ms, transform 200ms, box-shadow 200ms; }
         .glass-hover:hover {
-            border-color: rgba(56, 189, 248, 0.4);
-            background: rgba(15, 23, 42, 0.8);
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+            border-color: rgba(34,211,238,0.32);
+            background: rgba(14,30,50,0.9);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(2,8,23,0.4), 0 0 0 1px rgba(34,211,238,0.08);
         }
-        .neon-text { color: var(--neon-sky); text-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
-        .ticker-scroll { animation: ticker 40s linear infinite; }
+        .hairline { border-color: var(--hairline-soft); }
+        /* Focus */
+        :where(a, button, input, select, textarea):focus-visible {
+            outline: 2px solid var(--euv);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1E3A5F; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2A4A6B; }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #1E3A5F transparent; }
+        /* Blueprint grid - fab reticle */
+        .blueprint-grid {
+            background-image:
+                linear-gradient(to right, var(--grid) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+        .blueprint-grid-fine {
+            background-image:
+                linear-gradient(to right, rgba(34,211,238,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(34,211,238,0.03) 1px, transparent 1px);
+            background-size: 8px 8px;
+        }
+        /* Ticker */
+        .ticker-scroll { animation: ticker 80s linear infinite; }
         @keyframes ticker {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
-
         .fade-edge-x {
-            mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+            mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
         }
-        
-        /* Light Theme Override */
+        /* Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+            .ticker-scroll { animation: none; }
+        }
+        /* Light theme - keep dark as primary, light is secondary */
         html.light-theme {
-            filter: invert(1) hue-rotate(180deg);
-            background-color: #fff;
+            --void: #F8FAFC;
+            --panel: #FFFFFF;
+            --panel-soft: rgba(255,255,255,0.84);
+            --hairline: #E2E8F0;
+            --hairline-soft: rgba(226,232,240,0.9);
+            --signal: #0F172A;
+            --muted: #64748B;
+            background: #F1F5F9;
+            color: #0F172A;
         }
-        html.light-theme body {
-            background-color: #fdfdfd;
-        }
+        html.light-theme body { background: #F1F5F9; color: #0F172A; }
+        html.light-theme .glass { background: rgba(255,255,255,0.9); border-color: #E2E8F0; }
     </style>
 </head>
 <body>
     <div id="root"></div>
-    <script>
-        console.log('🚀 HTML loaded, waiting for React...');
-    </script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

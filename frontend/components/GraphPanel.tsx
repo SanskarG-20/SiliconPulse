@@ -44,115 +44,123 @@ export const GraphPanel: React.FC<{ company?: string }> = ({ company }) => {
 
   if (!company) {
     return (
-      <div className="p-4 rounded-xl bg-slate-900/30 border border-slate-800/50">
-        <div className="flex items-center space-x-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-          <Network size={12} className="text-sky-500" />
-          <span>Supply-Chain Graph</span>
+      <div className="rounded-[14px] border border-[#1C3553]/40 bg-[#0E1E32]/60 p-4">
+        <div className="flex items-center gap-1.5 mono text-[10px] font-semibold tracking-[0.12em] text-[#64748B]">
+          <Network size={12} className="text-[#22D3EE]" />
+          SUPPLY-CHAIN GRAPH
         </div>
-        <p className="text-[11px] text-slate-500 mt-2">Select a company to see upstream suppliers and downstream impact.</p>
+        <p className="mt-2 text-[12px] leading-relaxed text-[#64748B]">Select a company from the feed or the explorer to see upstream and downstream.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 rounded-xl bg-slate-900/30 border border-slate-800/50 space-y-3">
-      <div className="flex items-center space-x-2 text-[10px] font-black text-sky-500 uppercase tracking-widest">
+    <div className="rounded-[14px] border border-[#1C3553]/50 bg-[#0E1E32]/50 p-4 space-y-4">
+      <div className="flex items-center gap-1.5 mono text-[10px] font-semibold tracking-[0.12em] text-[#22D3EE]">
         <Network size={12} />
-        <span>Graph RAG — {company}</span>
-        {loading && <span className="text-slate-500 animate-pulse">loading…</span>}
+        GRAPH RAG — {company}
+        {loading && <span className="ml-1 text-[#475569] animate-pulse">loading…</span>}
       </div>
 
       {data ? (
         <>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-              <Layers size={10} className="mr-1" /> Upstream
-            </div>
+            <p className="display flex items-center gap-1 text-[10px] font-semibold tracking-[0.1em] text-[#94A3B8]">
+              <Layers size={10} /> UPSTREAM
+            </p>
             {Object.keys(data.suppliers).length === 0 ? (
-              <p className="text-[11px] text-slate-500">No suppliers in graph</p>
+              <p className="mt-1 text-[12px] text-[#475569]">No suppliers in graph</p>
             ) : (
-              <ul className="mt-1 space-y-1">
-                {Object.entries(data.suppliers).slice(0, 4).map(([k, v]: any) => (
-                  <li key={k} className="text-[11px] text-slate-300 flex items-center">
-                    <span className="text-sky-400 font-bold">{k}</span>
-                    <ArrowRight size={10} className="mx-1 text-slate-600" />
-                    <span className="text-slate-500">score {v.score}</span>
-                  </li>
-                ))}
+              <ul className="mt-2 space-y-1">
+                {Object.entries(data.suppliers)
+                  .slice(0, 4)
+                  .map(([k, v]: any) => (
+                    <li key={k} className="flex items-center justify-between rounded-full bg-[#050B1A] border border-[#1C3553]/40 px-2.5 py-1">
+                      <span className="text-[12px] font-semibold text-[#22D3EE]">{k}</span>
+                      <span className="mono text-[10px] tracking-[0.06em] text-[#475569]">score {v.score}</span>
+                    </li>
+                  ))}
               </ul>
             )}
           </div>
 
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-              <Network size={10} className="mr-1" /> Downstream
-            </div>
+            <p className="display flex items-center gap-1 text-[10px] font-semibold tracking-[0.1em] text-[#94A3B8]">
+              <Network size={10} /> DOWNSTREAM
+            </p>
             {Object.keys(data.impact).length === 0 ? (
-              <p className="text-[11px] text-slate-500">No downstream impact</p>
+              <p className="mt-1 text-[12px] text-[#475569]">No downstream impact</p>
             ) : (
-              <ul className="mt-1 space-y-1">
-                {Object.entries(data.impact).slice(0, 4).map(([k, v]: any) => (
-                  <li key={k} className="text-[11px] text-slate-300 flex items-center">
-                    <span className="text-emerald-400 font-bold">{k}</span>
-                    <ArrowRight size={10} className="mx-1 text-slate-600" />
-                    <span className="text-slate-500">score {v.score}</span>
-                  </li>
-                ))}
+              <ul className="mt-2 space-y-1">
+                {Object.entries(data.impact)
+                  .slice(0, 4)
+                  .map(([k, v]: any) => (
+                    <li key={k} className="flex items-center justify-between rounded-full bg-[#050B1A] border border-[#1C3553]/40 px-2.5 py-1">
+                      <span className="text-[12px] font-semibold text-[#E8A253]">{k}</span>
+                      <span className="mono text-[10px] tracking-[0.06em] text-[#475569]">score {v.score}</span>
+                    </li>
+                  ))}
               </ul>
             )}
           </div>
 
-          <details className="mt-2">
-            <summary className="text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer">Raw context</summary>
-            <pre className="mt-2 text-[10px] text-slate-400 whitespace-pre-wrap leading-relaxed bg-slate-950/50 p-2 rounded border border-slate-800">{data.context}</pre>
+          <details className="rounded-[10px] bg-[#050B1A] border border-[#1C3553]/30 p-2">
+            <summary className="mono cursor-pointer text-[10px] font-semibold tracking-[0.08em] text-[#475569]">Raw context</summary>
+            <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[#94A3B8] custom-scrollbar">{data.context}</pre>
           </details>
 
-          <div className="mt-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
-            <div className="flex items-center space-x-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
-              <Zap size={12} />
-              <span>Scenario Engine — What if?</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <select value={metric} onChange={e => setMetric(e.target.value)} className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300">
+          <div className="rounded-[14px] border border-[#E8A253]/15 bg-[#E8A253]/[0.06] p-3 space-y-3">
+            <p className="flex items-center gap-1.5 mono text-[10px] font-bold tracking-[0.12em] text-[#E8A253]">
+              <Zap size={12} /> SCENARIO — WHAT IF?
+            </p>
+            <div className="flex items-center gap-2">
+              <select value={metric} onChange={(e) => setMetric(e.target.value)} className="rounded-full bg-[#050B1A] border border-[#1C3553] px-2.5 py-1 text-[11px] font-medium text-[#CBD5E1] focus:border-[#E8A253]/30 focus:outline-none">
                 <option value="yield">Yield</option>
                 <option value="capacity">Capacity</option>
                 <option value="supply">Supply</option>
               </select>
-              <input
-                type="range"
-                min={-50}
-                max={30}
-                value={shock}
-                onChange={e => setShock(parseInt(e.target.value))}
-                className="flex-1 accent-amber-500"
-              />
-              <span className={`text-[11px] font-black min-w-[40px] text-right ${shock < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{shock > 0 ? '+' : ''}{shock}%</span>
+              <input type="range" min={-50} max={30} value={shock} onChange={(e) => setShock(parseInt(e.target.value))} className="flex-1 accent-[#E8A253]" />
+              <span className={`mono min-w-[44px] text-right text-[11px] font-bold ${shock < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {shock > 0 ? '+' : ''}
+                {shock}%
+              </span>
             </div>
             <button
               onClick={handleSimulate}
               disabled={simLoading}
-              className="w-full py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded text-[11px] font-black uppercase tracking-widest flex items-center justify-center space-x-1"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-full bg-[#E8A253] py-1.5 text-[11px] font-bold tracking-[0.06em] text-[#050B1A] hover:bg-[#F0A85E] disabled:opacity-50 transition-colors"
             >
-              {simLoading ? <><TrendingUp size={12} className="animate-pulse" /><span>Simulating…</span></> : <><AlertTriangle size={12} /><span>Simulate Shock</span></>}
+              {simLoading ? (
+                <>
+                  <TrendingUp size={13} className="animate-pulse" /> Simulating…
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={13} /> Simulate shock
+                </>
+              )}
             </button>
             {simData && (
-              <div className="space-y-2">
-                <div className="text-[11px] text-slate-300">
-                  <div className="font-bold text-amber-400">Impact: {simData.company} {shock}% {metric}</div>
-                  <div className="text-[10px] text-slate-500">{simData.impact_text?.slice(0, 300)}</div>
-                </div>
+              <div className="space-y-2 pt-2 border-t border-[#E8A253]/15">
+                <p className="text-[11px] font-semibold text-[#E8A253]">Impact: {simData.company} {shock}% {metric}</p>
+                <p className="mono text-[10px] leading-relaxed text-[#64748B] line-clamp-3">{simData.impact_text?.slice(0, 280)}</p>
                 {simData.impact && Object.keys(simData.impact).length > 0 && (
                   <ul className="space-y-1">
-                    {Object.entries(simData.impact).slice(0, 4).map(([k, v]: any) => (
-                      <li key={k} className="text-[11px] flex items-center justify-between bg-slate-900/50 px-2 py-1 rounded border border-slate-800">
-                        <span className="font-bold text-slate-200">{k}</span>
-                        <span className={`text-[10px] font-black ${v.severity === 'High' ? 'text-red-400' : v.severity === 'Medium' ? 'text-amber-400' : 'text-emerald-400'}`}>{v.delta > 0 ? '+' : ''}{v.delta} • ${v.est_impact_usd_m}M</span>
-                      </li>
-                    ))}
+                    {Object.entries(simData.impact)
+                      .slice(0, 4)
+                      .map(([k, v]: any) => (
+                        <li key={k} className="flex items-center justify-between rounded-full bg-[#050B1A] border border-[#1C3553]/40 px-2.5 py-1">
+                          <span className="text-[11px] font-semibold text-[#E2E8F0]">{k}</span>
+                          <span className={`mono text-[10px] font-bold ${v.severity === 'High' ? 'text-red-400' : v.severity === 'Medium' ? 'text-[#E8A253]' : 'text-emerald-400'}`}>
+                            {v.delta > 0 ? '+' : ''}
+                            {v.delta} • ${v.est_impact_usd_m}M
+                          </span>
+                        </li>
+                      ))}
                   </ul>
                 )}
                 {simData.scenario_report && (
-                  <div className="max-h-[200px] overflow-y-auto custom-scrollbar border-t border-amber-500/20 pt-2">
+                  <div className="max-h-[200px] overflow-auto rounded-[10px] border border-[#1C3553]/30 bg-[#050B1A] p-2 custom-scrollbar">
                     <StrategicInsightReport data={simData.scenario_report} />
                   </div>
                 )}
@@ -161,7 +169,7 @@ export const GraphPanel: React.FC<{ company?: string }> = ({ company }) => {
           </div>
         </>
       ) : (
-        !loading && <p className="text-[11px] text-slate-500">No graph data for {company}</p>
+        !loading && <p className="text-[12px] text-[#475569]">No graph data for {company}</p>
       )}
     </div>
   );

@@ -424,6 +424,8 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
             logger.warning(f"Graph enrichment failed: {ge}")
         graph_context = "\n".join(graph_parts) if graph_parts else "No supply-chain graph data for query."
 
+        from ..models import InsightReport
+        
         prompt = f"""
         You are SiliconPulse, an advanced strategic intelligence engine.
         Generate a high-precision intelligence report based on the provided context.
@@ -438,41 +440,15 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
 
         INSTRUCTIONS:
         - Analyze the provided evidence carefully.
-        - Output strictly valid JSON. Do not include markdown formatting (like ```json).
         - IMPORTANT: Even if there is only ONE evidence item, extract all possible facts and implications.
         - If evidence is low, focus on "What we know" vs "What we don't know".
         - Include uncertainties and monitoring suggestions in the "outlook" section.
         - Ensure the "confidence" section reflects the limited data (e.g., "Low" or "Medium").
-
-        JSON SCHEMA:
-        {{
-          "sections": [
-            {{ "id": "evidence", "title": "Live Signal Evidence", "points": ["..."], "evidence": [ {{ "source": "...", "timestamp": "...", "title": "..." }} ] }},
-            {{ "id": "change", "title": "What Changed", "points": ["..."] }},
-            {{ "id": "impact", "title": "Impact Reasoning", "points": ["..."] }},
-            {{ "id": "competitors", "title": "Competitor Effects", "points": ["..."] }},
-            {{ "id": "outlook", "title": "Strategic Outlook & Uncertainties", "points": ["..."] }},
-            {{ "id": "confidence", "title": "Confidence Meter", "value": "Low|Medium|High", "reason": "..." }},
-            {{ "id": "ceo", "title": "CEO Summary", "text": "..." }}
-          ]
-        }}
+        - For the "ceo" section, use the "text" field to provide a paragraph summary.
+        - For other sections (like "evidence", "change", "impact", "competitors", "outlook"), provide a list of "points".
         """
 
-        insight_text = await gemini_client.generate_content_with_fallback(prompt)
-
-        if insight_text.startswith("```json"):
-            insight_text = insight_text[7:]
-        if insight_text.endswith("```"):
-            insight_text = insight_text[:-3]
-
-        insight_text = insight_text.strip()
-
-        try:
-            parsed_json = json.loads(insight_text)
-            insight_text = json.dumps(parsed_json)
-        except json.JSONDecodeError:
-            logger.warning("Gemini output invalid JSON, attempting repair or fallback.")
-            pass
+        insight_text = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
 
         if user_id:
             ensure_user(user_id, user_email)

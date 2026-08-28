@@ -86,11 +86,22 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
             query_cache.set(body.query, body.k, result)
             return QueryResponse(**result)
 
+        # Freshness-aware read with graceful fallback to stale data when stream is cold.
+        # The demo seed is often >12h old; hard-filtering to 0 would make every query fall back to INSUFFICIENT.
         events = safe_read_jsonl(
             data_path,
             limit=settings.max_events_to_scan,
             freshness_hours=settings.freshness_hours
         )
+        if not events:
+            # No fresh events — return most recent regardless of age so queries remain grounded.
+            events = safe_read_jsonl(
+                data_path,
+                limit=settings.max_events_to_scan,
+                freshness_hours=None
+            )
+            if events:
+                logger.info(f"[{request_id}] No fresh events in {settings.freshness_hours}h window, fell back to stale ({len(events)} items)")
 
         # ---- STAGE A: Vector semantic search (if available) ----
         vector_hits: dict[str, float] = {}  # title -> similarity
@@ -150,7 +161,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                 t = event.get("title", "")
                 if t in vector_hits and t not in seen_titles_kw:
                     sim = vector_hits[t]
-                    if sim >= 0.72:  # semantic threshold
+                    if sim >= 0.55:  # semantic threshold (lowered from 0.72 to avoid masking valid signals when embeddings are noisy)
                         matched_events.append(event)
             logger.info(f"[{request_id}] Hybrid merge: {len(matched_events)} total (vector added {len(matched_events) - len(seen_titles_kw & set(vector_hits))})")
 
@@ -239,6 +250,12 @@ async def get_radar():
             limit=settings.max_events_to_scan,
             freshness_hours=settings.freshness_hours
         )
+        if not events:
+            events = safe_read_jsonl(
+                data_path,
+                limit=settings.max_events_to_scan,
+                freshness_hours=None
+            )
 
         company_counts = {}
         for event in events:
@@ -290,8 +307,17 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
                 )
             return GenerateResponse(insight=fallback_text)
 
-        evidence_count = body.context.count("[20")
-
+        # Robust evidence counting: frontend builds "LIVE UPDATES CONTEXT:\n[ts | source] ..." so an empty context is "".
+        # Counting "[20" is fragile (year-dependent); count evidence delimiters instead.
+        stripped = body.context.strip() if body.context else ""
+        if not stripped or stripped == "LIVE UPDATES CONTEXT:":
+            evidence_count = 0
+        else:
+            # Each evidence block starts with "["; count them.
+            evidence_count = stripped.count("[")
+            # Fallback: if no "[" found but context is non-empty, treat as having evidence
+            if evidence_count == 0 and len(stripped) > 20:
+                evidence_count = 1
         logger.info(f"Generating insight for query: '{body.query}' | Evidence Count: {evidence_count} | Context Len: {len(body.context)}")
 
         if evidence_count == 0:

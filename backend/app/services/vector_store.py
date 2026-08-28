@@ -27,6 +27,33 @@ _lock = threading.Lock()
 _available: bool | None = None
 
 
+def _reset_collection():
+    global _collection, _available
+    with _lock:
+        try:
+            import chromadb
+
+            path = str(Path(settings.db_path).parent / "chroma")
+            client = chromadb.PersistentClient(path=path)
+            try:
+                client.delete_collection(name="signals")
+                logger.warning("Chroma collection deleted due to dimension mismatch, recreating")
+            except Exception:
+                pass
+            _collection = client.get_or_create_collection(
+                name="signals",
+                metadata={"hnsw:space": "cosine"},
+            )
+            _available = True
+            logger.info(f"Chroma collection recreated at {path} ({_collection.count()} vectors)")
+            return _collection
+        except Exception as e:
+            logger.warning(f"Chroma reset failed: {e}")
+            _available = False
+            _collection = None
+            return None
+
+
 def _get_collection():
     global _collection, _available
     if _collection is not None:
@@ -114,7 +141,22 @@ def upsert_signals(events: list[dict], embeddings: list[list[float]]) -> int:
             )
             vecs.append(emb)
         if ids:
-            coll.upsert(ids=ids, documents=docs, metadatas=metas, embeddings=vecs)
+            try:
+                coll.upsert(ids=ids, documents=docs, metadatas=metas, embeddings=vecs)
+            except Exception as e:
+                if "dimension" in str(e).lower():
+                    logger.warning(f"Chroma dimension mismatch ({e}), resetting collection")
+                    coll = _reset_collection()
+                    if coll is not None:
+                        try:
+                            coll.upsert(ids=ids, documents=docs, metadatas=metas, embeddings=vecs)
+                        except Exception as e2:
+                            logger.warning(f"Chroma upsert retry failed: {e2}")
+                            return 0
+                    else:
+                        return 0
+                else:
+                    raise
             return len(ids)
     except Exception as e:
         logger.warning(f"Chroma upsert failed: {e}")
@@ -153,7 +195,11 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
             out.append(item)
         return out
     except Exception as e:
-        logger.warning(f"Chroma query failed: {e}")
+        if "dimension" in str(e).lower():
+            logger.warning(f"Chroma query dimension mismatch ({e}), resetting collection")
+            _reset_collection()
+        else:
+            logger.warning(f"Chroma query failed: {e}")
         return []
 
 

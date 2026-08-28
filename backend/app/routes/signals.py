@@ -28,6 +28,8 @@ async def get_signals():
             limit=20,
             freshness_hours=settings.freshness_hours
         )
+        if not events:
+            events = safe_read_jsonl(data_path, limit=20, freshness_hours=None)
 
         return events
     except Exception as e:

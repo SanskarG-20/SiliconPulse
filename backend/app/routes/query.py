@@ -67,7 +67,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
 
         data_path = settings.resolved_data_path
 
-        if not data_path.exists():
+        if not data_path.exists() and not vector_available():
             result = {
                 "query": body.query,
                 "evidence": [],
@@ -86,93 +86,114 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
             query_cache.set(body.query, body.k, result)
             return QueryResponse(**result)
 
-        # Freshness-aware read with graceful fallback to stale data when stream is cold.
-        # The demo seed is often >12h old; hard-filtering to 0 would make every query fall back to INSUFFICIENT.
-        events = safe_read_jsonl(
-            data_path,
-            limit=settings.max_events_to_scan,
-            freshness_hours=settings.freshness_hours
-        )
-        if not events:
-            # No fresh events — return most recent regardless of age so queries remain grounded.
+        matched_events = []
+        db_search_successful = False
+
+        # Attempt Database-level Hybrid Search (RRF)
+        if vector_available():
+            try:
+                from ..services.vector_store import query_hybrid
+                q_emb = await embed_text(body.query)
+                if q_emb:
+                    # Construct keyword text with aliases for full text search
+                    raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
+                    query_keywords = set(raw_keywords)
+                    
+                    for company, data in COMPANY_DICT.items():
+                        aliases = [a.lower() for a in data.get("aliases", [])]
+                        aliases.append(company.lower())
+                        is_relevant = any(kw in aliases for kw in raw_keywords)
+                        if is_relevant:
+                            query_keywords.update(aliases)
+                    
+                    # Convert keywords to an OR query for websearch_to_tsquery
+                    ts_query_parts = []
+                    for kw in query_keywords:
+                        if " " in kw:
+                            ts_query_parts.append(f'"{kw}"')
+                        else:
+                            ts_query_parts.append(kw)
+                    ts_query_text = " OR ".join(ts_query_parts) if ts_query_parts else body.query
+
+                    # Execute DB search
+                    db_hits = query_hybrid(ts_query_text, q_emb, k=body.k * 2)
+                    
+                    if db_hits is not None:
+                        matched_events = db_hits
+                        db_search_successful = True
+                        logger.info(f"[{request_id}] Used DB Hybrid Search, found {len(db_hits)} hits.")
+            except Exception as e:
+                logger.warning(f"[{request_id}] DB Hybrid search failed, falling back to local: {e}")
+
+        # Fallback to local file-based search
+        if not db_search_successful:
             events = safe_read_jsonl(
                 data_path,
                 limit=settings.max_events_to_scan,
-                freshness_hours=None
+                freshness_hours=settings.freshness_hours
             )
-            if events:
-                logger.info(f"[{request_id}] No fresh events in {settings.freshness_hours}h window, fell back to stale ({len(events)} items)")
+            if not events:
+                events = safe_read_jsonl(
+                    data_path,
+                    limit=settings.max_events_to_scan,
+                    freshness_hours=None
+                )
+                if events:
+                    logger.info(f"[{request_id}] No fresh events in {settings.freshness_hours}h window, fell back to stale ({len(events)} items)")
 
-        # ---- STAGE A: Vector semantic search (if available) ----
-        vector_hits: dict[str, float] = {}  # title -> similarity
-        use_vector = vector_available() and bool(events)
-        if use_vector:
-            try:
-                q_emb = await embed_text(body.query)
-                if q_emb:
-                    similar = query_similar(q_emb, k=min(30, len(events) * 2))
-                    for hit in similar:
-                        t = hit.get("title", "")
-                        if t:
-                            vector_hits[t] = float(hit.get("similarity", 0.0))
-                    logger.info(f"[{request_id}] Vector hits: {len(vector_hits)}")
-            except Exception as ve:
-                logger.warning(f"[{request_id}] Vector search failed: {ve}")
+            vector_hits: dict[str, float] = {}
+            if vector_available() and bool(events):
+                try:
+                    q_emb = await embed_text(body.query)
+                    if q_emb:
+                        similar = query_similar(q_emb, k=min(30, len(events) * 2))
+                        for hit in similar:
+                            t = hit.get("title", "")
+                            if t:
+                                vector_hits[t] = float(hit.get("similarity", 0.0))
+                        logger.info(f"[{request_id}] Vector hits: {len(vector_hits)}")
+                except Exception as ve:
+                    logger.warning(f"[{request_id}] Vector search failed: {ve}")
 
-        # ---- STAGE B: Keyword matching (alias-expanded) ----
-        matched_events = []
+            raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
+            query_keywords = set(raw_keywords)
+            for company, data in COMPANY_DICT.items():
+                aliases = [a.lower() for a in data.get("aliases", [])]
+                aliases.append(company.lower())
+                is_relevant = False
+                for kw in raw_keywords:
+                    if kw in aliases:
+                        is_relevant = True
+                        break
+                if is_relevant:
+                    query_keywords.update(aliases)
+            query_keywords = list(query_keywords)
 
-        raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
-        query_keywords = set(raw_keywords)
-
-        for company, data in COMPANY_DICT.items():
-            aliases = [a.lower() for a in data.get("aliases", [])]
-            aliases.append(company.lower())
-
-            is_relevant = False
-            for kw in raw_keywords:
-                if kw in aliases:
-                    is_relevant = True
-                    break
-
-            if is_relevant:
-                query_keywords.update(aliases)
-
-        query_keywords = list(query_keywords)
-        logger.info(f"Expanded Query Keywords: {query_keywords}")
-
-        for event in events:
-            title = event.get("title", "").lower()
-            content = event.get("content", "").lower()
-            company = event.get("company", "").lower() if event.get("company") else ""
-
-            match_count = 0
-            for keyword in query_keywords:
-                if keyword in title or keyword in content or keyword in company:
-                    match_count += 1
-
-            if match_count > 0:
-                matched_events.append(event)
-
-        # ---- STAGE C: Merge vector hits not caught by keywords ----
-        if vector_hits:
-            seen_titles_kw = {e.get("title") for e in matched_events}
             for event in events:
-                t = event.get("title", "")
-                if t in vector_hits and t not in seen_titles_kw:
-                    sim = vector_hits[t]
-                    if sim >= 0.55:  # semantic threshold (lowered from 0.72 to avoid masking valid signals when embeddings are noisy)
-                        matched_events.append(event)
-            logger.info(f"[{request_id}] Hybrid merge: {len(matched_events)} total (vector added {len(matched_events) - len(seen_titles_kw & set(vector_hits))})")
+                title = event.get("title", "").lower()
+                content = event.get("content", "").lower()
+                company = event.get("company", "").lower() if event.get("company") else ""
+                match_count = sum(1 for keyword in query_keywords if keyword in title or keyword in content or keyword in company)
+                if match_count > 0:
+                    matched_events.append(event)
 
-        seen = set()
-        unique_matched = []
-        for event in matched_events:
-            key = (event.get("title"), event.get("source"))
-            if key not in seen:
-                seen.add(key)
-                unique_matched.append(event)
-        matched_events = unique_matched
+            if vector_hits:
+                seen_titles_kw = {e.get("title") for e in matched_events}
+                for event in events:
+                    t = event.get("title", "")
+                    if t in vector_hits and t not in seen_titles_kw:
+                        sim = vector_hits[t]
+                        if sim >= 0.55:
+                            matched_events.append(event)
+
+            seen = set()
+            unique_matched = []
+            for event in matched_events:
+                key = (event.get("title"), event.get("source"))
+                if key not in seen:
+                    seen.add(key)
+                    unique_matched.append(event)
+            matched_events = unique_matched
 
         evidence_list = []
         for event in matched_events:

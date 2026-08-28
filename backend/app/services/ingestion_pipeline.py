@@ -44,9 +44,26 @@ async def ingest_pdf_bytes(
             return {"status": "error", "message": "No text extracted from PDF", "added": 0}
 
         # LLM extraction
-        events = await extract_events_from_text(text, source=source, max_events=10)
+        events, edges = await extract_events_from_text(text, source=source, max_events=10)
+        
+        edges_added = 0
+        if edges and vector_available():
+            from app.supabase_client import supabase
+            for edge in edges:
+                try:
+                    supabase.table("graph_edges").upsert({
+                        "source": edge["source"],
+                        "target": edge["target"],
+                        "relation": edge["relation"],
+                        "weight": edge["weight"],
+                        "details": edge["details"]
+                    }, on_conflict="source,target,relation").execute()
+                    edges_added += 1
+                except Exception as e:
+                    logger.warning(f"Failed to insert edge {edge}: {e}")
+
         if not events:
-            return {"status": "empty", "message": "No material events extracted", "added": 0, "text_len": len(text)}
+            return {"status": "empty", "message": "No material events extracted", "added": 0, "edges_added": edges_added, "text_len": len(text)}
 
         # Deduplicate and append
         data_path = settings.resolved_data_path
@@ -58,12 +75,13 @@ async def ingest_pdf_bytes(
             "text_len": len(text),
             "extracted_events": len(events),
             "added": added,
+            "edges_added": edges_added,
             "vector_enabled": vector_available(),
         }
 
     except Exception as e:
         logger.error(f"PDF ingestion failed: {e}", exc_info=True)
-        return {"status": "error", "message": str(e), "added": 0}
+        return {"status": "error", "message": str(e), "added": 0, "edges_added": 0}
 
 
 async def ingest_sec_filings(days_back: int = 3, symbols: list[str] | None = None) -> dict:
@@ -84,16 +102,34 @@ async def ingest_sec_filings(days_back: int = 3, symbols: list[str] | None = Non
         # For each filing, extract text and then LLM events
         total_added = 0
         total_events = 0
+        total_edges = 0
+        
         for filing in filings[:10]:  # limit to 10 most recent
             # Use filing title+description as text; if SEC filing has URL, could fetch PDF but skip for now
             filing_text = f"{filing.get('title','')} {filing.get('description','')} {filing.get('url','')}".strip()
             if not filing_text:
                 continue
-            events = await extract_events_from_text(
+            events, edges = await extract_events_from_text(
                 filing_text,
                 source="SECFiling",
                 max_events=3,
             )
+            
+            if edges and vector_available():
+                from app.supabase_client import supabase
+                for edge in edges:
+                    try:
+                        supabase.table("graph_edges").upsert({
+                            "source": edge["source"],
+                            "target": edge["target"],
+                            "relation": edge["relation"],
+                            "weight": edge["weight"],
+                            "details": edge["details"]
+                        }, on_conflict="source,target,relation").execute()
+                        total_edges += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to insert SEC edge {edge}: {e}")
+
             if events:
                 # Tag with filing metadata
                 for ev in events:
@@ -110,9 +146,10 @@ async def ingest_sec_filings(days_back: int = 3, symbols: list[str] | None = Non
             "fetched": len(filings),
             "extracted_events": total_events,
             "added": total_added,
+            "edges_added": total_edges,
             "symbols": symbols,
         }
 
     except Exception as e:
         logger.error(f"SEC ingestion failed: {e}", exc_info=True)
-        return {"status": "error", "message": str(e), "added": 0}
+        return {"status": "error", "message": str(e), "added": 0, "edges_added": 0}

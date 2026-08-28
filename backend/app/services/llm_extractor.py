@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """
 LLM-based extraction service for financial/supply-chain events.
 Takes raw text (PDF, SEC filing) and extracts structured event dicts via Gemini.
 """
+
+from __future__ import annotations
 
 import json
 import logging

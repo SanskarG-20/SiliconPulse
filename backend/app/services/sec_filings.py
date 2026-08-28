@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """
 SEC EDGAR 8-K filing ingestion via Finnhub API.
 Fetches recent 8-K filings for tracked companies and extracts structured events.
 """
+
+from __future__ import annotations
 
 import logging
 import os

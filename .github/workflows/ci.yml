@@ -107,3 +107,4 @@ jobs:
         env:
           PYTHONPATH: ../backend
           CI: true
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_dummy_for_ci

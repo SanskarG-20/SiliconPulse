@@ -19,6 +19,10 @@ export default defineConfig({
       url: 'http://127.0.0.1:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
+      env: {
+        ...(process.env.VITE_CLERK_PUBLISHABLE_KEY ? { VITE_CLERK_PUBLISHABLE_KEY: process.env.VITE_CLERK_PUBLISHABLE_KEY } : {}),
+        ...(process.env.VITE_API_BASE_URL ? { VITE_API_BASE_URL: process.env.VITE_API_BASE_URL } : {}),
+      },
     },
     {
       command: 'python -m uvicorn app.main:app --port 8000 --host 127.0.0.1',

@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """
 Unified ingestion pipeline for PDF and SEC filings.
 Takes raw documents -> text -> LLM events -> deduplicate_and_append.
 """
+
+from __future__ import annotations
 
 import logging
 

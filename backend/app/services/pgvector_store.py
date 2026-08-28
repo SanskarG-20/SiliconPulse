@@ -1,13 +1,12 @@
-from __future__ import annotations
-
 """
 Supabase pgvector store for SiliconPulse signals.
 Uses signals_vec table (vector(768)) + match_signals RPC.
 Graceful no-op when Supabase not configured or pgvector not enabled.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

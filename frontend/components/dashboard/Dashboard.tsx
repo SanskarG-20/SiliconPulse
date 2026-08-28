@@ -87,22 +87,44 @@ const Dashboard: React.FC = () => {
     setError,
   } = useDashboard();
 
+  const [dismissedWarn, setDismissedWarn] = React.useState(() => localStorage.getItem('dismissedLocalhostWarn') === '1');
+
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
       <BackgroundLayer />
-      {shouldWarnLocalhost && (
+      {shouldWarnLocalhost && !dismissedWarn && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-amber-400 font-black uppercase tracking-widest text-sm mb-2">⚠️ Misconfigured API URL</h2>
+            <p className="text-slate-300 text-sm mb-3">Production is using <code className="bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200">{apiBaseUrl}</code> (localhost). Browsers block this → “Backend offline”.</p>
+            <ol className="text-slate-400 text-xs list-decimal list-inside space-y-1 mb-4">
+              <li>Vercel → Project → Settings → Environment Variables</li>
+              <li>Add <code className="bg-slate-800 px-1 rounded">VITE_API_BASE_URL</code> = <code className="bg-slate-800 px-1 rounded">https://your-backend.onrender.com/api</code></li>
+              <li>Save → **Redeploy** (Vercel → Deployments → … → Redeploy)</li>
+              <li>Hard refresh this page</li>
+            </ol>
+            <p className="text-[11px] text-slate-500 mb-4">Current: <code>{apiBaseUrl}</code> — Render URL is shown in Render Dashboard → your service → top bar.</p>
+            <div className="flex space-x-2">
+              <button onClick={() => window.location.reload()} className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-black uppercase">Reload after fix</button>
+              <button onClick={() => { localStorage.setItem('dismissedLocalhostWarn', '1'); setDismissedWarn(true); }} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-bold">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {shouldWarnLocalhost && dismissedWarn && (
         <div className="bg-amber-500/20 border-b border-amber-500/30 text-amber-200 text-[11px] font-bold text-center py-2 px-4 z-50">
           ⚠️ Production is using localhost API ({apiBaseUrl}). Set <code className="bg-amber-500/20 px-1 rounded">VITE_API_BASE_URL=https://your-backend.onrender.com/api</code> in Vercel → Settings → Environment Variables → Redeploy.
+          <button onClick={() => { localStorage.removeItem('dismissedLocalhostWarn'); setDismissedWarn(false); }} className="ml-2 underline">Show fix</button>
         </div>
       )}
       {!backendOnline && (
         <div className="bg-red-500/10 border-b border-red-500/20 text-red-300 text-xs text-center py-2 px-4 z-50 flex items-center justify-center space-x-2">
-          <span>{isWakingUp ? "⏳ Backend is waking up (Render free tier, ~30s) — retrying..." : `🔴 Backend offline (tried ${apiBaseUrl})`}</span>
+          <span>{isWakingUp ? "⏳ Backend is waking up (Render free tier, ~30s) — retrying automatically every 15s..." : `🔴 Backend offline (tried ${apiBaseUrl}) — auto-retrying...`}</span>
           {!isWakingUp && (
             <button onClick={async () => {
               const ok = await waitForBackendAndRetry();
               if (ok && lastSubmittedQuery) handleSubmit(lastSubmittedQuery);
-              else if (!ok) setError(`Backend still offline after retries (tried ${apiBaseUrl}). Check Render dashboard logs.`);
+              else if (!ok) setError(`Backend still offline after retries (tried ${apiBaseUrl}). Check Render dashboard logs and that VITE_API_BASE_URL is not localhost.`);
             }} className="ml-2 px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 rounded text-[10px] font-black uppercase tracking-widest">Retry Now</button>
           )}
         </div>

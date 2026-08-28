@@ -337,6 +337,23 @@ export const useDashboard = (): UseDashboardReturn => {
     return ok;
   }, [notify, mutateSignals]);
 
+  // Auto-retry when offline (permanent fix for Render wake + transient network)
+  useEffect(() => {
+    if (backendOnline || isWakingUp) return;
+    // Don't auto-retry if misconfigured localhost in prod — user must fix env var
+    if (SHOULD_WARN_LOCALHOST_IN_PROD) return;
+    const id = window.setInterval(async () => {
+      const ok = await checkBackendHealth();
+      if (ok) {
+        setBackendOnline(true);
+        notify("Backend back online — live feed resumed");
+        mutateSignals();
+        window.clearInterval(id);
+      }
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [backendOnline, isWakingUp, notify, mutateSignals]);
+
   useEffect(() => {
     const init = async () => {
       try {

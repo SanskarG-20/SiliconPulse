@@ -38,6 +38,28 @@ services:
       timeout: 3s
       retries: 3
 
+  worker:
+    build: ./backend
+    container_name: siliconpulse-worker
+    command: python -m app.workers.distributed --workers 4
+    env_file:
+      - .env
+    environment:
+      - WORKER_COUNT=4
+      - REDIS_URL=redis://redis:6379/0
+      - DATA_STREAM_PATH=data/stream.jsonl
+      - DB_PATH=data/siliconpulse.db
+    volumes:
+      - ./backend/data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+
   frontend:
     build: ./frontend
     container_name: siliconpulse-frontend

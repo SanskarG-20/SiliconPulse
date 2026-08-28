@@ -35,6 +35,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Using DATA_STREAM_PATH={settings.resolved_data_path}")
     init_db()
     logger.info("Database initialized")
+    # Distributed workers (for 1M+ events/day) — no-op when disabled
+    try:
+        from app.workers.distributed import start_distributed_workers
+
+        start_distributed_workers()
+    except Exception as e:
+        logger.debug(f"Distributed workers not started: {e}")
     start_scheduler()
     logger.info("Real-time data scheduler started")
     yield
@@ -42,6 +49,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down SiliconPulse API...")
     stop_scheduler()
     logger.info("Scheduler stopped")
+    try:
+        from app.workers.distributed import stop_distributed_workers
+
+        stop_distributed_workers()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -193,6 +206,16 @@ async def metrics():
     except Exception:
         vector_count_val = -1
         embed_cache = -1
+    # Worker stats (distributed)
+    try:
+        from app.workers.distributed import get_pool
+
+        wp = get_pool()
+        w_stats = wp.stats()
+        w_depth = wp.depth()
+    except Exception:
+        w_stats = {"processed": 0, "batches": 0, "errors": 0, "workers": 0}
+        w_depth = {"backend": "memory", "shards": 0}
     return {
         "uptime_seconds": uptime,
         "requests_total": REQUEST_COUNT,
@@ -201,5 +224,7 @@ async def metrics():
         "dedup_seen_events": seen_count,
         "vector_signals": vector_count_val,
         "embedding_cache_entries": embed_cache,
+        "workers": w_stats,
+        "queue": w_depth,
         "timestamp": now_ts(),
     }

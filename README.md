@@ -475,7 +475,7 @@ Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
 - [x] Frontend tests for GraphPanel / Scenario slider (`GraphPanel.test.tsx` + `GraphExplorer.test.tsx`, Vitest + jsdom, 6 tests)
 - [x] Ingest & vector fallback coverage (`test_ingest.py` + `test_vector_fallback.py`, 12 tests, 44 total backend)
 - [x] Distributed limiter via Redis (`limiter.py:8` `REDIS_URL`, `docker-compose.yml:redis`)
-- [ ] Distributed Pathway workers (target 1M+ events/day)
+- [x] Distributed ingestion workers (`app/workers/distributed.py` shard-aware pool, `app/workers/queue.py` Redis Stream → memory fallback, `app/workers/pathway_distributed.py` sharded Pathway, `docker-compose.yml:worker` + `WORKER_COUNT`)
 
 ---
 

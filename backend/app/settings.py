@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     newsapi_api_key: str = ""
     redis_url: str = ""  # optional: redis://... for distributed rate limiting
 
+    # Distributed workers (1M+ events/day)
+    worker_count: int = 4
+    worker_batch_size: int = 50
+    use_distributed_workers: bool = False
+
     model_config = SettingsConfigDict(
         env_file = ".env",
         env_file_encoding = "utf-8",

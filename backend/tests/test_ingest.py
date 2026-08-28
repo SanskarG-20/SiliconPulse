@@ -96,5 +96,6 @@ def test_llm_extractor_no_key_returns_empty():
 
     # Ensure no GEMINI_API_KEY
     with patch("app.services.llm_extractor.settings.gemini_api_key", ""):
-        events = asyncio.run(extract_events_from_text("Some financial report about TSMC yield", source="Test"))
+        events, edges = asyncio.run(extract_events_from_text("Some financial report about TSMC yield", source="Test"))
         assert events == []
+        assert edges == []

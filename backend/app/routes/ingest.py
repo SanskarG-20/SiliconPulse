@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Ingestion routes for PDF and SEC filings.
 """

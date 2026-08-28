@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Search, Home, RefreshCw, Coffee, Moon, Sun, Menu, Zap, Activity, X 
+  Search, Home, RefreshCw, Coffee, Moon, Sun, Menu, Zap, Activity, X, Upload
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -11,6 +11,7 @@ interface HeaderProps {
   onGenerateDigest: () => void;
   onToggleTheme: () => void;
   onOpenInject: () => void;
+  onOpenPdf: () => void;
   onOpenMobileMenu: () => void;
   isLightMode: boolean;
   showMobileMenu: boolean;
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   onGenerateDigest,
   onToggleTheme,
   onOpenInject,
+  onOpenPdf,
   onOpenMobileMenu,
   isLightMode,
   showMobileMenu,
@@ -103,6 +105,14 @@ export const Header: React.FC<HeaderProps> = ({
           title="Toggle Theme"
         >
           {isLightMode ? <Moon size={12} /> : <Sun size={12} />}
+        </button>
+        <button
+          onClick={onOpenPdf}
+          className="flex items-center space-x-2 px-2 md:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-md text-[10px] font-black uppercase tracking-widest text-amber-400 border border-amber-500/20 transition-all active:scale-95"
+        >
+          <Upload size={12} />
+          <span className="hidden sm:inline">Upload PDF</span>
+          <span className="sm:hidden">PDF</span>
         </button>
         <button
           onClick={onOpenInject}

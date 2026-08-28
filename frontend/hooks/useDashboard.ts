@@ -75,6 +75,8 @@ interface UseDashboardReturn {
   setShowMobileMenu: (v: boolean) => void;
   isLightMode: boolean;
   setIsLightMode: (v: boolean) => void;
+  showPdfModal: boolean;
+  setShowPdfModal: (v: boolean) => void;
   // Computed
   evidenceItems: any[];
   filteredEvidenceItems: any[];
@@ -133,6 +135,7 @@ export const useDashboard = (): UseDashboardReturn => {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [exportFormat, setExportFormat] = useState('md');
   const [includeEvidence, setIncludeEvidence] = useState(true);
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   // Daily Digest Modal State
   const [showDigestModal, setShowDigestModal] = useState(false);
@@ -618,6 +621,8 @@ export const useDashboard = (): UseDashboardReturn => {
     setShowMobileMenu,
     isLightMode,
     setIsLightMode,
+    showPdfModal,
+    setShowPdfModal,
     // Computed
     evidenceItems,
     filteredEvidenceItems,

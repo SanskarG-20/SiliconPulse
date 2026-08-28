@@ -10,6 +10,7 @@ import { ExportModal } from '../modals/ExportModal';
 import { VerifyModal } from '../modals/VerifyModal';
 import { DigestModal } from '../modals/DigestModal';
 import { MobileDrawer } from '../modals/MobileDrawer';
+import { PdfUploadModal } from '../modals/PdfUploadModal';
 import { useDashboard } from '../../hooks/useDashboard';
 
 const Dashboard: React.FC = () => {
@@ -60,6 +61,8 @@ const Dashboard: React.FC = () => {
     setShowMobileMenu,
     isLightMode,
     setIsLightMode,
+    showPdfModal,
+    setShowPdfModal,
     // Computed
     evidenceItems,
     filteredEvidenceItems,
@@ -177,6 +180,18 @@ const Dashboard: React.FC = () => {
         content={dailyDigest}
       />
 
+      {/* PDF UPLOAD MODAL */}
+      <PdfUploadModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        onSuccess={(msg) => {
+          notify(msg);
+          // refresh SWR signals via page reload of signals handled by hook's mutate
+          // trigger a manual signals refresh by toggling
+          window.setTimeout(() => window.location.reload(), 800);
+        }}
+      />
+
       {/* MOBILE DRAWER */}
       <MobileDrawer
         isOpen={showMobileMenu}
@@ -195,6 +210,7 @@ const Dashboard: React.FC = () => {
         onGenerateDigest={generateDailyDigest}
         onToggleTheme={() => setIsLightMode(!isLightMode)}
         onOpenInject={() => setShowInjectModal(true)}
+        onOpenPdf={() => setShowPdfModal(true)}
         onOpenMobileMenu={() => setShowMobileMenu(true)}
         isLightMode={isLightMode}
         showMobileMenu={showMobileMenu}

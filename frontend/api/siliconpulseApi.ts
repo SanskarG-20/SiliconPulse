@@ -352,3 +352,24 @@ export const fetchMetrics = async (): Promise<any | null> => {
         return null;
     }
 };
+
+export const uploadPdf = async (file: File): Promise<any> => {
+    const form = new FormData();
+    form.append('file', file);
+    // Don't set Content-Type — browser will set multipart boundary
+    const response = await apiFetch(`/ingest/pdf`, { method: 'POST', body: form }, 60000);
+    if (!response.ok) {
+        const err = await parseJsonSafely(response, { detail: response.statusText });
+        throw new Error((err as any)?.detail || `Upload failed: ${response.status}`);
+    }
+    return parseJsonSafely(response, {});
+};
+
+export const triggerSecIngest = async (daysBack: number = 3): Promise<any> => {
+    const response = await apiFetch(`/ingest/sec?days_back=${daysBack}`, { method: 'POST' }, 60000);
+    if (!response.ok) {
+        const err = await parseJsonSafely(response, { detail: response.statusText });
+        throw new Error((err as any)?.detail || `SEC ingest failed: ${response.status}`);
+    }
+    return parseJsonSafely(response, {});
+};

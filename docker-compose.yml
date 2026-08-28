@@ -38,6 +38,18 @@ services:
       timeout: 3s
       retries: 3
 
+  pathway:
+    build: ./backend
+    container_name: siliconpulse-pathway
+    command: python pathway_pipeline.py
+    env_file:
+      - .env
+    volumes:
+      - ./backend/data:/app/data
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+
   worker:
     build: ./backend
     container_name: siliconpulse-worker

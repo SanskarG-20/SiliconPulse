@@ -4,6 +4,7 @@ Utility functions for SiliconPulse backend
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
 import json
 import logging
 import re
@@ -11,6 +12,7 @@ import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 # Import storage module (circular import avoidance handled by function calls)
 # We'll import inside functions where needed or rely on caller to pass dependencies if strict separation required
@@ -40,6 +42,248 @@ _alias_entries.sort(key=lambda x: len(x[0]), reverse=True)
 for alias_lower, canonical in _alias_entries:
     if alias_lower not in _COMPANY_ALIAS_MAP:
         _COMPANY_ALIAS_MAP[alias_lower] = canonical
+
+# ---------------------------------------------------------------------------
+# HTML sanitization & URL cleaning (fix raw <a href> + &#x2F; + utm_ tracking)
+# ---------------------------------------------------------------------------
+
+_TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_name", "utm_reader", "utm_viz_id", "fbclid", "gclid",
+    "igshid", "mc_eid", "mkt_tok", "_hsenc", "_hsmi",
+}
+
+# Regex to find URLs even inside truncated hrefs
+_URL_RE = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
+_TAG_RE = re.compile(r"<[^>]*>")
+_WS_RE = re.compile(r"\s+")
+
+def _decode_entities(text: str) -> str:
+    """Double-decode to handle &#x2F; and &amp; chains."""
+    if not text:
+        return ""
+    # html.unescape handles &#x2F;, &#47;, &amp; etc. Do twice for double-encoded
+    prev = None
+    cur = text
+    for _ in range(3):
+        if cur == prev:
+            break
+        prev = cur
+        cur = html_lib.unescape(cur)
+    return cur
+
+def clean_url(url: str) -> str:
+    """Decode entities, strip tracking params, and normalize URL. Returns "" if not a valid http URL."""
+    if not url:
+        return ""
+    try:
+        url = _decode_entities(url).strip().strip("'\"")
+        # Handle truncated URLs ending with ... (from HN story_text) - keep as is but clean what we can
+        is_truncated = url.endswith("...") or url.endswith("…")
+        # Remove trailing punctuation that is not part of URL when truncated
+        # Parse
+        parsed = urlparse(url if not is_truncated else url.rstrip(".…"))
+        if parsed.scheme not in ("http", "https"):
+            return ""
+        # Filter tracking params
+        qsl = parse_qsl(parsed.query, keep_blank_values=True)
+        filtered = [(k, v) for k, v in qsl if k.lower() not in _TRACKING_PARAMS]
+        new_query = urlencode(filtered, doseq=True)
+        cleaned = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+        if is_truncated and not cleaned.endswith("..."):
+            cleaned += "..."
+        # Remove empty ? if no query left
+        if cleaned.endswith("?"):
+            cleaned = cleaned[:-1]
+        return cleaned
+    except Exception:
+        return url
+
+def _extract_href_urls(html_text: str) -> list[str]:
+    """Extract href values from <a> tags (decoded and cleaned)."""
+    if not html_text or "<a" not in html_text.lower():
+        return []
+    # Find href="..."/href='...'
+    href_re = re.compile(r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+    urls = []
+    for m in href_re.finditer(html_text):
+        raw = m.group(1)
+        cleaned = clean_url(_decode_entities(raw))
+        if cleaned:
+            urls.append(cleaned)
+    return urls
+
+def html_to_text(html_text: str) -> str:
+    """
+    Convert HTML fragment to clean plain text.
+    - Decodes entities, strips tags, collapses whitespace.
+    - Extracts <a> link texts but not raw <a> markup.
+    - Handles malformed HTML gracefully via regex fallback.
+    """
+    if not html_text:
+        return ""
+    # Decode first so tags become recognizable
+    text = _decode_entities(html_text)
+    # Replace block tags with newlines/spaces before stripping
+    text = re.sub(r"</p\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</div\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<li[^>]*>", "• ", text, flags=re.IGNORECASE)
+    # Strip remaining tags
+    text = _TAG_RE.sub(" ", text)
+    # Fallback for malformed fragments without closing > (e.g., truncated HN: <a href="https://x.com/...)
+    text = re.sub(r"<[^>\s]*", " ", text)
+    # Decode again after stripping (in case entities were inside tags)
+    text = _decode_entities(text)
+    # Collapse whitespace and newlines
+    text = _WS_RE.sub(" ", text)
+    text = re.sub(r"\s*\n\s*", "\n", text)
+    # Clean up spaces around punctuation and multiple newlines
+    text = re.sub(r"\n{2,}", "\n", text)
+    text = re.sub(r" \n", "\n", text)
+    return text.strip()
+
+def sanitize_content(raw_html: str, max_len: int = 800) -> str:
+    """
+    Sanitize HackerNews/GDELT style HTML fragments into human-readable plain text.
+    - Decodes &#x2F;, &amp;, etc.
+    - Strips <a href> but keeps link text; de-duplicates URLs that appear as both href and text
+    - Removes tracking params from any URLs that remain in text
+    - Truncates intelligently at sentence/word boundary
+    """
+    if not raw_html:
+        return ""
+    # Quick path: if no HTML markers, just decode and clean URLs in text
+    if "<" not in raw_html and "&" not in raw_html:
+        # Still clean URLs in plain text
+        decoded = _decode_entities(raw_html)
+        # Clean URLs inline
+        def _replace_url(m):
+            return clean_url(m.group(0))
+        cleaned = _URL_RE.sub(_replace_url, decoded)
+        cleaned = _WS_RE.sub(" ", cleaned).strip()
+        if len(cleaned) > max_len:
+            # Truncate at word boundary
+            truncated = cleaned[:max_len].rsplit(" ", 1)[0]
+            return truncated + "…"
+        return cleaned
+
+    # For HTML, replace <a> tags with their href (cleaned) when display is truncated URL
+    decoded_html = _decode_entities(raw_html)
+
+    def _anchor_replacer(m):
+        href = m.group(1) or ""
+        display = m.group(2) or ""
+        href_clean = clean_url(_decode_entities(href))
+        # display may still contain HTML (e.g., <i>); strip it for comparison
+        display_text = html_to_text(display).strip() if display else ""
+        # If display is a truncated URL that is prefix of href, prefer href
+        if display_text.startswith("http"):
+            disp_base = display_text.rstrip(".…").lower().rstrip("/")
+            href_base = href_clean.rstrip(".…").lower().rstrip("/")
+            if disp_base and href_base.startswith(disp_base) and len(href_clean) > len(display_text):
+                return href_clean + " "
+            if disp_base == href_base:
+                return href_clean + " "
+        if display_text:
+            return display_text + " "
+        return href_clean + " "
+
+    # Well-formed <a href="...">display</a>
+    decoded_html = re.sub(r'<a[^>]*href\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)</a>', _anchor_replacer, decoded_html, flags=re.IGNORECASE | re.DOTALL)
+    # Malformed <a href="..."> without closing > or </a> (e.g., truncated HN) — handle missing closing quote or >
+    decoded_html = re.sub(r'<a[^>]*href\s*=\s*["\']([^"\']+)["\']?[^>]*>?', lambda m: clean_url(_decode_entities(m.group(1))) + " ", decoded_html, flags=re.IGNORECASE)
+    # Handle truncated href without closing quote at all (HN truncates mid-URL)
+    decoded_html = re.sub(r'<a[^>]*href\s*=\s*["\']?(https?://[^"\'>\s]+)', lambda m: clean_url(_decode_entities(m.group(1))) + " ", decoded_html, flags=re.IGNORECASE)
+
+    text = html_to_text(decoded_html)
+
+    # Clean any URLs that remain in the text (they are now plain text, but may still have tracking)
+    def _clean_url_match(m):
+        url = m.group(0)
+        # If this URL's base matches a href we already have, it might be duplicate display text; keep one
+        cleaned = clean_url(url)
+        return cleaned
+
+    text = _URL_RE.sub(_clean_url_match, text)
+
+    # De-duplicate: if text contains same URL twice in a row (href text + href URL), collapse
+    # Simple heuristic: split and dedup consecutive duplicate URLs
+    parts = text.split()
+    deduped_parts: list[str] = []
+    seen_urls: set[str] = set()
+    for part in parts:
+        # Check if part is a URL
+        if part.startswith("http"):
+            base = part.lower().rstrip("/.…,")
+            # Compare base without scheme
+            try:
+                p = urlparse(part)
+                base_key = f"{p.netloc}{p.path}".lower().rstrip("/")
+            except Exception:
+                base_key = base
+            if base_key in seen_urls:
+                continue
+            seen_urls.add(base_key)
+        deduped_parts.append(part)
+    text = " ".join(deduped_parts)
+
+    # Final whitespace cleanup
+    text = _WS_RE.sub(" ", text).strip()
+    text = re.sub(r"\s*([.,;:!?])", r"\1", text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r"\s+\)", ")", text)
+
+    # Truncate at word boundary
+    if len(text) > max_len:
+        truncated = text[:max_len].rsplit(" ", 1)[0]
+        # Avoid cutting inside URL
+        if truncated.count("http") != text[:max_len].count("http"):
+            # If we cut a URL, extend to include it or cut before it
+            last_http = truncated.rfind("http")
+            if last_http != -1:
+                # Keep the URL if it started before max_len
+                url_match = _URL_RE.search(text[last_http:])
+                if url_match:
+                    url_full = clean_url(url_match.group(0))
+                    truncated = truncated[:last_http] + url_full
+                    if len(truncated) > max_len + 100:
+                        truncated = truncated[:max_len].rsplit(" ", 1)[0] + "…"
+                        return truncated
+        return truncated + "…"
+
+    return text
+
+def sanitize_title(raw_title: str) -> str:
+    """Sanitize title: decode entities, strip tags, collapse whitespace."""
+    if not raw_title:
+        return ""
+    # Titles should never contain HTML, but HN _highlightResult injects <em> tags
+    t = _decode_entities(raw_title)
+    t = _TAG_RE.sub("", t)
+    t = _decode_entities(t)
+    t = _WS_RE.sub(" ", t).strip()
+    return t
+
+def extract_primary_url(href_html: str, fallback_url: str) -> str:
+    """
+    Choose the best canonical URL for View source.
+    - Prefer fallback_url (story_url) if it is a real http URL
+    - Otherwise extract first href from html and clean it
+    """
+    fallback_clean = clean_url(fallback_url) if fallback_url else ""
+    if fallback_clean and fallback_clean.startswith("http"):
+        return fallback_clean
+    hrefs = _extract_href_urls(href_html or "")
+    if hrefs:
+        return hrefs[0]
+    # Fallback: extract any URL from text
+    text = _decode_entities(href_html or "")
+    m = _URL_RE.search(text)
+    if m:
+        return clean_url(m.group(0))
+    return fallback_clean
 
 def extract_companies(text: str) -> list[str]:
     """
@@ -272,6 +516,20 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
     events_to_write = []
 
     for event in new_events:
+        # Sanitize before dedup so IDs are based on clean text (fixes legacy &#x2F; duplicates)
+        try:
+            if event.get("title"):
+                event["title"] = sanitize_title(str(event["title"]))
+            if event.get("content"):
+                event["content"] = sanitize_content(str(event["content"]), max_len=2000)
+            if event.get("snippet"):
+                event["snippet"] = sanitize_content(str(event["snippet"]), max_len=600)
+            if event.get("url"):
+                cleaned = clean_url(str(event["url"]))
+                if cleaned:
+                    event["url"] = cleaned
+        except Exception:
+            pass
         event_id = compute_event_id(event)
 
         # Check if seen in DB
@@ -312,6 +570,19 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
                     ).start()
         except Exception as e:
             logger.debug(f"Vector indexing skipped: {e}")
+
+        # Publish to Redis Pub/Sub for WebSockets
+        try:
+            import os
+            from app.settings import settings
+            url = (settings.redis_url or os.getenv("REDIS_URL", "")).strip()
+            if url and url != "memory://":
+                import redis
+                client = redis.Redis.from_url(url, decode_responses=True, socket_timeout=1)
+                # Publish JSON payload containing the new events
+                client.publish("siliconpulse:signals", json.dumps({"events": events_to_write}, default=str))
+        except Exception as e:
+            logger.debug(f"Failed to publish to redis: {e}")
 
     return added_count
 
@@ -371,6 +642,23 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = 
                         event.setdefault("source", "Unknown")
                         event.setdefault("snippet", str(event.get("content") or title)[:300])
                         event.setdefault("content", event.get("snippet") or title)
+
+                        # Sanitize legacy HTML artifacts (HackerNews &#x2F; + <a href> + utm_) on read
+                        try:
+                            if event.get("title"):
+                                event["title"] = sanitize_title(str(event["title"]))
+                            if event.get("content"):
+                                event["content"] = sanitize_content(str(event["content"]), max_len=2000)
+                            if event.get("snippet"):
+                                event["snippet"] = sanitize_content(str(event["snippet"]), max_len=600)
+                            if event.get("url"):
+                                cleaned = clean_url(str(event["url"]))
+                                if cleaned:
+                                    event["url"] = cleaned
+                            if event.get("source"):
+                                event["source"] = sanitize_title(str(event["source"]))
+                        except Exception:
+                            pass
 
                         if freshness_hours is not None and not is_fresh(event.get("timestamp", ""), freshness_hours):
                             continue

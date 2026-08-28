@@ -6,12 +6,13 @@ interface WSSignalsMessage {
   type: 'signals' | 'pong';
   count?: number;
   events?: any[];
+  isAppend?: boolean;
 }
 
 interface UseSignalsWSOptions {
   token: string | null;
   enabled: boolean;
-  onSignals: (events: any[]) => void;
+  onSignals: (events: any[], isAppend?: boolean) => void;
   onStatusChange?: (status: WSStatus) => void;
   // Derived from VITE_API_BASE_URL: http(s)://host/api -> ws(s)://host/api/ws/signals
   baseUrl?: string;
@@ -84,7 +85,9 @@ export const useSignalsWS = ({
         try {
           const msg: WSSignalsMessage = JSON.parse(ev.data);
           if (msg.type === 'signals' && Array.isArray(msg.events)) {
-            onSignalsRef.current(msg.events);
+            // Check if backend instructed to append (i.e. only new events sent)
+            const isAppend = msg.isAppend === true;
+            onSignalsRef.current(msg.events, isAppend);
           }
         } catch { /* ignore malformed */ }
       };

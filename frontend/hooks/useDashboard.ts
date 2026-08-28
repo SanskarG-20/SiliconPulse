@@ -222,11 +222,38 @@ export const useDashboard = (): UseDashboardReturn => {
     });
   }, [liveFeed, watchlist]);
 
-  const processSignals = useCallback((signals: any[]) => {
+  const processSignals = useCallback((signals: any[], isAppend = false) => {
     if (signals && signals.length > 0) {
       setBackendOnline(true);
       setIsWakingUp(false);
       const mappedSignals: LiveEvent[] = signals.map((s: any, idx: number) => createLiveEvent(s, idx));
+      
+      let allMapped = mappedSignals;
+      if (isAppend) {
+        // We get new events; prepend them to the existing feed and deduplicate by id
+        setLiveFeed(prev => {
+          const combined = [...mappedSignals, ...prev];
+          const seen = new Set<string>();
+          const deduped = combined.filter(ev => {
+            if (seen.has(ev.id)) return false;
+            seen.add(ev.id);
+            return true;
+          });
+          const ordered = buildLiveFeed(deduped, 10);
+          
+          const recommendationsResult = generateRecommendationsFromFeed(
+            ordered,
+            recommendationKeysRef.current,
+            remoteRecommendationsRef.current
+          );
+          recommendationKeysRef.current = recommendationsResult.nextKeys;
+          setRecommendations(recommendationsResult.recommendations);
+          
+          return ordered;
+        });
+        return;
+      }
+      
       const ordered = buildLiveFeed(mappedSignals, 10);
 
       if (ordered.length === 0) {

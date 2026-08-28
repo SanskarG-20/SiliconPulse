@@ -126,3 +126,41 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
     except Exception as e:
         logger.warning(f"pgvector query failed: {e}")
         return []
+
+
+def query_hybrid(query_text: str, query_embedding: list[float], k: int = 20) -> list[dict]:
+    """
+    Perform hybrid search using the match_signals_hybrid RPC (RRF combining semantic + full text).
+    """
+    client = _get_supabase()
+    if client is None or not query_embedding or not query_text:
+        return []
+    try:
+        res = client.rpc(
+            "match_signals_hybrid",
+            {
+                "query_text": query_text,
+                "query_embedding": query_embedding,
+                "match_count": k,
+                "full_text_weight": 1.0,
+                "semantic_weight": 1.0,
+            },
+        ).execute()
+        
+        data = res.data or []
+        out = []
+        for row in data:
+            meta = row.get("metadata", {}) if isinstance(row, dict) else {}
+            item = dict(meta)
+            item["similarity"] = round(float(row.get("similarity", 0.0)), 4)
+            item["distance"] = round(1.0 - float(row.get("similarity", 0.0)), 4)
+            item["content"] = row.get("document", "")
+            item["rank_score"] = round(float(row.get("rank_score", 0.0)), 4)
+            
+            if "title" not in item:
+                item["title"] = row.get("document", "")[:200]
+            out.append(item)
+        return out
+    except Exception as e:
+        logger.warning(f"pgvector hybrid query failed: {e}")
+        return []

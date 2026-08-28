@@ -203,6 +203,21 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
         return []
 
 
+def query_hybrid(query_text: str, query_embedding: list[float], k: int = 20) -> list[dict] | None:
+    """
+    Perform hybrid search (RRF) using pgvector.
+    Returns None if pgvector is unavailable, signaling the caller to fall back to local search.
+    """
+    if _pg_available() and _pg is not None:
+        try:
+            return _pg.query_hybrid(query_text, query_embedding, k=k)
+        except Exception as e:
+            logger.debug(f"pgvector query_hybrid failed: {e}")
+    
+    return None
+
+
+
 def count() -> int:
     if _pg_available():
         try:

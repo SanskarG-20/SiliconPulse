@@ -43,6 +43,27 @@ def pull_all_sources():
     except Exception as e:
         logger.error(f"Error during scheduled pull: {e}", exc_info=True)
 
+
+def pull_sec_filings_sync():
+    """Sync wrapper for SEC 8-K ingestion (best-effort, async)."""
+    try:
+        import asyncio
+
+        from app.services.ingestion_pipeline import ingest_sec_filings
+
+        logger.info("Starting SEC 8-K ingestion...")
+        try:
+            result = asyncio.run(ingest_sec_filings(days_back=3))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(ingest_sec_filings(days_back=3))
+            finally:
+                loop.close()
+        logger.info(f"SEC ingestion result: {result}")
+    except Exception as e:
+        logger.warning(f"SEC ingestion skipped/failed: {e}")
+
 def start_scheduler():
     """Start the background scheduler"""
     # Run first pull in background thread so it doesn't block app startup
@@ -60,8 +81,13 @@ def start_scheduler():
         logger.warning("APScheduler is not installed; using lightweight fallback scheduler.")
 
         def fallback_loop():
+            sec_counter = 0
             while not _fallback_stop.wait(300):
                 pull_all_sources()
+                sec_counter += 1
+                if sec_counter >= 72:  # 72 * 5min = 6h
+                    pull_sec_filings_sync()
+                    sec_counter = 0
 
         global _fallback_thread
         _fallback_thread = threading.Thread(target=fallback_loop, daemon=True)
@@ -71,9 +97,12 @@ def start_scheduler():
     # Schedule pulls every 5 minutes
     if not scheduler.get_job('pull_sources'):
         scheduler.add_job(pull_all_sources, 'interval', minutes=5, id='pull_sources')
+    # SEC 8-K ingestion every 6 hours (less frequent, heavier)
+    if not scheduler.get_job('pull_sec'):
+        scheduler.add_job(pull_sec_filings_sync, 'interval', hours=6, id='pull_sec')
     if not scheduler.running:
         scheduler.start()
-    logger.info("Background scheduler started - pulling data every 5 minutes (first pull running in background)")
+    logger.info("Background scheduler started - pulling data every 5 min (news) + 6h (SEC) (first pull running in background)")
 
 def stop_scheduler():
     """Stop the background scheduler"""

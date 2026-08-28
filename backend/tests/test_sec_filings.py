@@ -74,6 +74,7 @@ def test_sec_filings_no_api_key():
     """Test graceful handling when no API key is configured."""
     with patch.dict("os.environ", {"FINNHUB_API_KEY": ""}, clear=True):
         import importlib
+
         from app.services import sec_filings
         importlib.reload(sec_filings)
         service = sec_filings.SECFilingsService()

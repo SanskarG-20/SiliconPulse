@@ -5,15 +5,11 @@ SEC EDGAR 8-K filing ingestion via Finnhub API.
 Fetches recent 8-K filings for tracked companies and extracts structured events.
 """
 
-import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Optional
 
 import httpx
-
-from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +52,7 @@ class SECFilingsService:
 
     def __init__(self):
         self.api_key = os.getenv("FINNHUB_API_KEY", "")
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
 
     async def __aenter__(self):
         if self.api_key:

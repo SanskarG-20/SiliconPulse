@@ -4,6 +4,7 @@ from ..graph.routes import router as graph_router
 from .auth import router as auth_router
 from .diagnostics import router as diagnostics_router
 from .export import router as export_router
+from .ingest import router as ingest_router
 from .llm import router as llm_router
 from .query import router as query_router
 from .recommendations import router as recommendations_router
@@ -20,3 +21,4 @@ router.include_router(recommendations_router, prefix="", tags=["recommendations"
 router.include_router(diagnostics_router, prefix="/user", tags=["diagnostics"])
 router.include_router(llm_router, prefix="/llm", tags=["llm"])
 router.include_router(graph_router, prefix="/graph", tags=["graph"])
+router.include_router(ingest_router, prefix="/ingest", tags=["ingest"])

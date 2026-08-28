@@ -13,6 +13,7 @@ services:
       - PORT=8000
       - DATA_STREAM_PATH=data/stream.jsonl
       - DB_PATH=data/siliconpulse.db
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend/data:/app/data
     restart: unless-stopped
@@ -23,6 +24,20 @@ services:
       retries: 3
       start_period: 15s
 
+  redis:
+    image: redis:7-alpine
+    container_name: siliconpulse-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   frontend:
     build: ./frontend
     container_name: siliconpulse-frontend
@@ -32,3 +47,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  redis_data:

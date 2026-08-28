@@ -26,6 +26,10 @@ def is_supabase_enabled() -> bool:
 
 
 def get_supabase_client() -> Any | None:
+    """
+    Service-role client (bypasses RLS). Used for server-side writes.
+    RLS is enforced for direct client access via anon key; see migration 001_rls.sql.
+    """
     global _supabase_client, _supabase_failed
 
     if _supabase_client is not None:
@@ -51,6 +55,37 @@ def get_supabase_client() -> Any | None:
     except Exception as exc:
         logger.warning("Supabase client initialization failed: %s", exc)
         _supabase_failed = True
+        return None
+
+
+def get_user_scoped_client(jwt: str) -> Any | None:
+    """
+    Per-user client that respects RLS (requires SUPABASE_ANON_KEY + valid Clerk JWT).
+    Returns None if anon key not configured. Useful if you later expose Supabase
+    directly to the frontend with RLS. Currently backend uses service_role for writes.
+    """
+    if not is_supabase_enabled():
+        return None
+    anon = (settings.supabase_anon_key or "").strip()
+    if not anon:
+        return None
+    try:
+        from supabase import create_client
+
+        client = create_client(settings.supabase_url, anon)
+        # Supabase-py will send Authorization: Bearer <jwt> if you set auth
+        try:
+            client.auth.set_session(access_token=jwt, refresh_token="")  # type: ignore
+        except Exception:
+            pass
+        # Fallback: inject header manually for postgrest
+        try:
+            client.postgrest.auth(jwt)  # type: ignore
+        except Exception:
+            pass
+        return client
+    except Exception as exc:
+        logger.debug(f"User-scoped Supabase client failed: {exc}")
         return None
 
 

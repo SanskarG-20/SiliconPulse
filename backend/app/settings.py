@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     clerk_audience: str = ""
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    supabase_anon_key: str = ""  # optional, enables per-user RLS via anon + JWT
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
     gemini_fallback_models: list[str] = ["gemini-1.5-pro", "gemini-1.0-pro"]
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
 
     # External news providers (free APIs)
     newsapi_api_key: str = ""
+    redis_url: str = ""  # optional: redis://... for distributed rate limiting
 
     model_config = SettingsConfigDict(
         env_file = ".env",

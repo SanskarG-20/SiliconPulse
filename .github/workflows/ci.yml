@@ -65,6 +65,9 @@ jobs:
       - name: Run TypeScript type check
         run: npx tsc --noEmit
 
+      - name: Run Vitest unit tests
+        run: npm run test
+
       - name: Build production bundle
         run: npm run build
 

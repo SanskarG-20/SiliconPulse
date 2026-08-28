@@ -395,6 +395,7 @@ cd frontend
 npm run build                 # vite build (tsc + bundler, respects chunk limits)
 npx tsc --noEmit              # typecheck only
 npx eslint .                  # lint (ci runs with || true)
+npm run test                  # Vitest (jsdom) — GraphPanel + GraphExplorer
 
 # E2E — Playwright (needs both servers or uses webServer)
 cd frontend
@@ -403,7 +404,7 @@ npx playwright test --reporter=list
 # CI spawns: npm run dev -- --port 5173 --host 127.0.0.1  +  python -m uvicorn app.main:app --port 8000
 ```
 
-Tests cover: `test_smoke.py`, `test_query_flow.py`, `test_graph.py`, `test_vector.py`, `test_ws.py`, `test_sec_filings.py` (see `backend/tests/`). E2E specs: `e2e/health.spec.ts` (backend health + frontend title + auth redirect) and `e2e/query-flow.spec.ts`.
+Tests cover: `test_smoke.py`, `test_query_flow.py`, `test_graph.py`, `test_vector.py`, `test_vector_fallback.py`, `test_ingest.py`, `test_ws.py`, `test_sec_filings.py` (see `backend/tests/`). Frontend: `GraphPanel.test.tsx` + `GraphExplorer.test.tsx` (Vitest + Testing Library, jsdom). E2E specs: `e2e/health.spec.ts` and `e2e/query-flow.spec.ts`.
 
 ---
 
@@ -414,7 +415,7 @@ Workflow `.github/workflows/ci.yml` triggers on `push`/`pull_request` to `main`/
 | Job | Runner | Steps |
 |-----|--------|-------|
 | **Backend Tests & Lint** | `ubuntu-latest`, Python 3.11, `pip` cache | `pip install -r requirements.txt` → `ruff check app/ tests/ \| true` → `mypy app/ --ignore-missing-imports \| true` → `PYTHONPATH=. pytest tests/ -v` |
-| **Frontend Build & Lint** | `ubuntu-latest`, Node 20, `npm` cache | `npm ci` → `npx eslint . \| true` → `npx tsc --noEmit` → `npm run build` |
+| **Frontend Build & Lint** | `ubuntu-latest`, Node 20, `npm` cache | `npm ci` → `npx eslint . \| true` → `npx tsc --noEmit` → `npm run test` (Vitest) → `npm run build` |
 | **E2E Playwright** | `ubuntu-latest`, needs backend+frontend | `pip install` + `npm ci` + `npx playwright install --with-deps chromium` → `npx playwright test --reporter=list` with `PYTHONPATH=../backend`, `CI=true`, `VITE_CLERK_PUBLISHABLE_KEY=<dummy>` and `webServer` on 5173/8000 |
 
 Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
@@ -423,7 +424,7 @@ Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
 
 ## Deployment
 
-**Docker Compose** — `docker-compose.yml` builds `backend` (`python:3.11-slim`, `curl` healthcheck) and `frontend` (`node:20-alpine` build → `nginx:alpine`). Frontend `nginx.conf` proxies `/api/` and `/health` to `backend:8000`. Data persists at `./backend/data:/app/data`. Run `docker compose up --build`; frontend on `3000`, backend on `8000`.
+**Docker Compose** — `docker-compose.yml` builds `backend` (`python:3.11-slim`, `curl` healthcheck), `redis:7-alpine` (for `REDIS_URL=redis://redis:6379/0` distributed limiter) and `frontend` (`node:20-alpine` build → `nginx:alpine`). Frontend `nginx.conf` proxies `/api/` and `/health` to `backend:8000`. Data persists at `./backend/data:/app/data` + `redis_data`. Run `docker compose up --build`; frontend on `3000`, backend on `8000`, redis on `6379`.
 
 **Render (backend) + Vercel (frontend)** recommended:
 
@@ -438,7 +439,8 @@ Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
 
 * **Auth** — Every `/api/*` (and WS via `?token=`) validates a Clerk-issued RS256 JWT against `CLERK_ISSUER/.well-known/jwks.json`. Missing/invalid token → `401`. `audience` verified only when `CLERK_AUDIENCE` is set.
 * **CORS** — `allow_origins=["*"]`, `allow_credentials=False`, `allow_headers=["*"]` to support Vercel preview URLs. Do not switch `allow_credentials` to `True` without restricting origins, or browsers will block `Authorization` headers.
-* **Rate limiting** — `slowapi` with `memory://`; per-route limits above. Global exception handler falls back to 200 with empty evidence for `/query` on unhandled errors to avoid UI hangs; other paths return 500.
+* **Rate limiting** — `slowapi` with `memory://` by default, `REDIS_URL=redis://redis:6379/0` for distributed (see `backend/app/core/limiter.py:8` and `docker-compose.yml:redis`); per-route limits above. Global exception handler falls back to 200 with empty evidence for `/query` on unhandled errors to avoid UI hangs; other paths return 500.
+* **Row Level Security** — Supabase `supabase/migrations/001_rls.sql` enables RLS on `users`/`queries`/`insights`/`signals` (`user_id = auth.uid()::text`) and read-only `signals_vec` for `authenticated`; `service_role` bypasses RLS for server writes. Apply via Supabase SQL Editor; `get_user_scoped_client(jwt)` in `supabase_client.py:58` shows per-user flow.
 * **Secrets** — `.env` is gitignored (`extra=ignore` in settings). Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the client; only `VITE_*` vars are bundled. Rotate keys via dashboard and redeploy.
 * **Validation** — Pydantic models (`QueryRequest` 1–500 chars, `k` 1–20; `InjectRequest` title 1–200, content 1–5000; `ExportRequest` format `md|json|txt`) and PDF size/type checks.
 
@@ -469,9 +471,11 @@ Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
 - [x] PDF / SEC ingestion (PyMuPDF + Finnhub + LLM extraction)
 - [x] Scenario engine (`/api/graph/simulate` + LLM report)
 - [x] D3 force-graph explorer (`GraphExplorer.tsx` — force simulation, zoom/pan, drag, 19-node DAG, collapsible in Dashboard + sidebar `GraphPanel` detail)
+- [x] Supabase Row-Level Security (`supabase/migrations/001_rls.sql` + `supabase_client.py:58` per-user client, `signals_vec` read-only for authenticated)
+- [x] Frontend tests for GraphPanel / Scenario slider (`GraphPanel.test.tsx` + `GraphExplorer.test.tsx`, Vitest + jsdom, 6 tests)
+- [x] Ingest & vector fallback coverage (`test_ingest.py` + `test_vector_fallback.py`, 12 tests, 44 total backend)
+- [x] Distributed limiter via Redis (`limiter.py:8` `REDIS_URL`, `docker-compose.yml:redis`)
 - [ ] Distributed Pathway workers (target 1M+ events/day)
-- [ ] Supabase Row-Level Security and per-user signal scoping
-- [ ] Frontend tests for GraphPanel / Scenario slider
 
 ---
 

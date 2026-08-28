@@ -114,6 +114,7 @@ async def graph_simulate(request: Request, body: SimulateRequest, user=Depends(g
             from ..services.gemini_client import gemini_client
 
             shock_pct = int(body.shock * 100)
+            from ..models import InsightReport
             prompt = f"""
 You are SiliconPulse Scenario Engine. Simulate a supply-chain shock.
 
@@ -129,16 +130,8 @@ INSTRUCTIONS:
 - Quantify downstream $M impact using est_impact_usd_m
 - Suggest mitigations (dual-source, inventory, alternative fab)
 - Keep confidence Medium/Low due to simulation uncertainty
-JSON SCHEMA: {{"sections": [{{"id":"evidence","title":"Shock Evidence","points":[...]}}]}}
 """
-            scenario_report = await gemini_client.generate_content_with_fallback(prompt)
-            # Ensure valid JSON string
-            import json
-
-            try:
-                json.loads(scenario_report)
-            except Exception:
-                pass
+            scenario_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
         except Exception as e:
             import logging
 

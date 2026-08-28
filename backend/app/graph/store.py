@@ -41,17 +41,55 @@ EDGES: list[Edge] = [
 
 # Build adjacency for fast lookup
 _ADJ = {}
-for e in EDGES:
-    _ADJ.setdefault(e.source, []).append(e)
-    _ADJ.setdefault(e.target, [])  # ensure node exists
+_LAST_DB_FETCH = 0.0
 
+def _ensure_loaded():
+    global _ADJ, _LAST_DB_FETCH
+    import time
+    from ..supabase_client import get_supabase_client
+    
+    # Reload every 60s
+    if _ADJ and (time.time() - _LAST_DB_FETCH) < 60:
+        return
+        
+    client = get_supabase_client()
+    edges = list(EDGES)
+    if client:
+        try:
+            resp = client.table("graph_edges").select("*").execute()
+            db_edges = resp.data or []
+            seen = {(e.source, e.target, e.relation) for e in edges}
+            for row in db_edges:
+                key = (row["source"], row["target"], row["relation"])
+                if key not in seen:
+                    edges.append(Edge(
+                        source=row["source"],
+                        target=row["target"],
+                        relation=row["relation"],
+                        weight=row["weight"],
+                        details=row.get("details", "")
+                    ))
+                    seen.add(key)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to load dynamic edges: {e}")
+            
+    # Rebuild adjacency
+    new_adj = {}
+    for e in edges:
+        new_adj.setdefault(e.source, []).append(e)
+        new_adj.setdefault(e.target, [])
+    _ADJ = new_adj
+    _LAST_DB_FETCH = time.time()
 
 def get_nodes() -> list[str]:
+    _ensure_loaded()
     return sorted(_ADJ.keys())
 
 
 def get_edges() -> list[Edge]:
-    return list(EDGES)
+    _ensure_loaded()
+    return [e for edges in _ADJ.values() for e in edges]
 
 
 def get_impact(company: str, depth: int = 2) -> dict:
@@ -60,6 +98,7 @@ def get_impact(company: str, depth: int = 2) -> dict:
     Returns {node: {"distance": int, "path": [Edge, ...], "score": float}}
     Score = product of weights along path.
     """
+    _ensure_loaded()
     company = company.strip()
     # case-insensitive match
     canonical = next((n for n in _ADJ if n.lower() == company.lower()), None)
@@ -90,14 +129,17 @@ def get_impact(company: str, depth: int = 2) -> dict:
 
 def get_suppliers(company: str, depth: int = 2) -> dict:
     """Reverse BFS to find upstream suppliers."""
+    _ensure_loaded()
     company = company.strip()
     canonical = next((n for n in _ADJ if n.lower() == company.lower()), None)
     if not canonical:
         return {}
     # Build reverse adjacency
     rev: dict[str, list[Edge]] = {}
-    for e in EDGES:
-        rev.setdefault(e.target, []).append(e)
+    for edges in _ADJ.values():
+        for e in edges:
+            rev.setdefault(e.target, []).append(e)
+            
     result: dict[str, dict] = {}
     queue: list[tuple[str, list[Edge], float, int]] = [(canonical, [], 1.0, 0)]
     visited = {canonical}

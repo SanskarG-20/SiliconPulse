@@ -468,8 +468,8 @@ Lint steps are non-blocking (`|| true`); typecheck and tests are blocking.
 - [x] WebSocket live feed (`/api/ws/signals` + SWR fallback)
 - [x] PDF / SEC ingestion (PyMuPDF + Finnhub + LLM extraction)
 - [x] Scenario engine (`/api/graph/simulate` + LLM report)
+- [x] D3 force-graph explorer (`GraphExplorer.tsx` — force simulation, zoom/pan, drag, 19-node DAG, collapsible in Dashboard + sidebar `GraphPanel` detail)
 - [ ] Distributed Pathway workers (target 1M+ events/day)
-- [ ] D3 force-graph explorer (current is list + raw graph context)
 - [ ] Supabase Row-Level Security and per-user signal scoping
 - [ ] Frontend tests for GraphPanel / Scenario slider
 

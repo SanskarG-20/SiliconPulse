@@ -4,6 +4,7 @@ import { BackgroundLayer } from '../../components/BackgroundLayer';
 import { Header } from '../layout/Header';
 import { Sidebar } from '../layout/Sidebar';
 import { QueryZone } from './QueryZone';
+import { GraphExplorer } from '../GraphExplorer';
 import { InputBar } from '../layout/InputBar';
 import { InjectModal } from '../modals/InjectModal';
 import { ExportModal } from '../modals/ExportModal';
@@ -91,6 +92,8 @@ const Dashboard: React.FC = () => {
   } = useDashboard();
 
   const [dismissedWarn, setDismissedWarn] = React.useState(() => localStorage.getItem('dismissedLocalhostWarn') === '1');
+  const [showGraph, setShowGraph] = React.useState(() => localStorage.getItem('siliconpulse_showGraph') !== '0');
+  const [graphSelected, setGraphSelected] = React.useState<string | null>(null);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-slate-200 relative">
@@ -231,7 +234,37 @@ const Dashboard: React.FC = () => {
 
         {/* QUERY & REPORT ZONE */}
         <section className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar space-y-6">
+            {/* SUPPLY-CHAIN GRAPH EXPLORER */}
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-950/30 backdrop-blur-sm">
+              <button
+                onClick={() => {
+                  const next = !showGraph;
+                  setShowGraph(next);
+                  localStorage.setItem('siliconpulse_showGraph', next ? '1' : '0');
+                }}
+                className="flex w-full items-center justify-between p-4 text-left"
+              >
+                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                  {showGraph ? '▾' : '▸'} Supply-Chain Graph Explorer
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                  {showGraph ? 'Hide' : 'Show'} • D3 Force • {graphSelected ? `selected ${graphSelected}` : 'click a node'}
+                </span>
+              </button>
+              {showGraph && (
+                <div className="px-4 pb-4">
+                  <GraphExplorer
+                    selectedCompany={graphSelected}
+                    onSelectCompany={(company) => {
+                      setGraphSelected(company);
+                      handleCompanyClick(company);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
             <QueryZone
               queryResult={queryResult}
               loading={loading}

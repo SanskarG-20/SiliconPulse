@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
               clerk: ['@clerk/clerk-react'],
               genai: ['@google/genai', 'react-markdown'],
               swr: ['swr'],
+              d3: ['d3'],
             },
           },
         },

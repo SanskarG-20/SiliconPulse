@@ -15,6 +15,20 @@ from app.utils import get_primary_company
 logger = logging.getLogger(__name__)
 
 
+from pydantic import BaseModel, Field
+
+class LLMEvent(BaseModel):
+    title: str = Field(description="Concise event title, <100 chars")
+    content: str = Field(description="2-3 sentence summary")
+    event_type: str = Field(description="One of: financial, supply_chain, product_launch, m_and_a, contract, general")
+    company: str = Field(description="Primary company name, or Unknown")
+    confidence: str = Field(description="High, Medium, or Low")
+    timestamp: str = Field(default="", description="Timestamp if available")
+    url: str = Field(default="", description="URL if available")
+
+class LLMExtractionResult(BaseModel):
+    events: list[LLMEvent]
+
 EXTRACTION_PROMPT_TEMPLATE = """
 You are SiliconPulse, an expert financial intelligence extractor for semiconductor & AI supply chain.
 
@@ -27,15 +41,8 @@ DOCUMENT TEXT (truncated to {trunc_len} chars):
 
 INSTRUCTIONS:
 - Extract ALL distinct events that are material to semiconductor, AI, or tech supply chain.
-- For each event, provide: title (concise, <100 chars), content (2-3 sentence summary), event_type (one of: financial, supply_chain, product_launch, m_and_a, contract, general), company (primary company name, or Unknown), and confidence (High/Medium/Low).
 - Focus especially on: earnings, revenue, guidance, capex, yield, capacity, fab, supply, foundry, acquisition, merger, product launch, contract, partnership.
-- If no material events, return empty list.
-
-OUTPUT: Strictly valid JSON list, no markdown. Example:
-[
-  {{"title": "TSMC N2 yield hits 90%", "content": "TSMC reports 2nm yield milestone exceeding target...", "event_type": "supply_chain", "company": "TSMC", "confidence": "High"}},
-  {{"title": "NVIDIA reports Q2 revenue $30B", "content": "NVIDIA beats estimates...", "event_type": "financial", "company": "NVIDIA", "confidence": "High"}}
-]
+- If no material events, return an empty events list.
 """
 
 
@@ -63,39 +70,22 @@ async def extract_events_from_text(
     prompt = EXTRACTION_PROMPT_TEMPLATE.format(text=truncated, trunc_len=trunc_len)
 
     try:
-        raw = await gemini_client.generate_content_with_fallback(prompt)
+        raw = await gemini_client.generate_content_with_fallback(prompt, response_schema=LLMExtractionResult)
 
-        # Strip markdown fences if present
-        raw = raw.strip()
-        if raw.startswith("```"):
-            # remove ```json and ```
-            lines = raw.splitlines()
-            # remove first line if ```json
-            if lines[0].strip().startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            raw = "\n".join(lines).strip()
-
-        # Parse JSON
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
-            # Try to extract JSON array from text
-            start = raw.find("[")
-            end = raw.rfind("]")
-            if start != -1 and end != -1 and end > start:
-                data = json.loads(raw[start : end + 1])
-            else:
-                logger.warning(f"LLM extraction invalid JSON: {raw[:500]}")
-                return []
-
-        if not isinstance(data, list):
-            logger.warning(f"LLM extraction expected list, got {type(data)}")
+            logger.warning(f"LLM extraction invalid JSON: {raw[:500]}")
             return []
 
+        events_data = data.get("events", [])
+        if not isinstance(events_data, list):
+            logger.warning(f"LLM extraction expected list in 'events', got {type(events_data)}")
+            return []
+
+
         events = []
-        for item in data[:max_events]:
+        for item in events_data[:max_events]:
             if not isinstance(item, dict):
                 continue
             title = str(item.get("title", "")).strip()

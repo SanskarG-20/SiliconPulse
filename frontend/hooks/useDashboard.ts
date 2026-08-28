@@ -440,7 +440,9 @@ export const useDashboard = (): UseDashboardReturn => {
       setLoading(false);
 
       const context = formatEvidenceToContext(result.evidence ?? []);
-      generateInsight(finalQuery.trim(), context)
+      generateInsight(finalQuery.trim(), context, (chunk) => {
+        setInsight(chunk);
+      })
         .then(generatedInsight => {
           setInsight(generatedInsight);
         })
@@ -576,7 +578,9 @@ export const useDashboard = (): UseDashboardReturn => {
     if (!queryResult) return;
     setInsight(null);
     const context = formatEvidenceToContext(queryResult.evidence ?? []);
-    generateInsight(queryResult.query, context)
+    generateInsight(queryResult.query, context, (chunk) => {
+      setInsight(chunk);
+    })
       .then(generatedInsight => {
         setInsight(generatedInsight);
       })

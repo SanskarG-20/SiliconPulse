@@ -307,7 +307,7 @@ async def get_radar():
         return []
 
 
-@router.post("/generate", response_model=GenerateResponse)
+@router.post("/generate")
 @limiter.limit("10/minute")
 async def generate_insight(request: Request, body: GenerateRequest, user=Depends(get_current_user)):
     """Generate insight using Gemini based on query and context."""
@@ -448,19 +448,25 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
         - For other sections (like "evidence", "change", "impact", "competitors", "outlook"), provide a list of "points".
         """
 
-        insight_text = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+        from fastapi.responses import StreamingResponse
+        
+        async def stream_generator():
+            full_text = ""
+            async for chunk in gemini_client.generate_content_stream_with_fallback(prompt, response_schema=InsightReport):
+                full_text += chunk
+                yield chunk
+                
+            if user_id:
+                ensure_user(user_id, user_email)
+                insert_insight_record(
+                    user_id=user_id,
+                    query_text=body.query,
+                    insight=full_text,
+                    model_name=settings.gemini_model,
+                    status="success",
+                )
 
-        if user_id:
-            ensure_user(user_id, user_email)
-            insert_insight_record(
-                user_id=user_id,
-                query_text=body.query,
-                insight=insight_text,
-                model_name=settings.gemini_model,
-                status="success",
-            )
-
-        return GenerateResponse(insight=insight_text)
+        return StreamingResponse(stream_generator(), media_type="text/plain")
 
     except Exception as e:
         logger.error(f"Gemini Generation Failed: {e}")

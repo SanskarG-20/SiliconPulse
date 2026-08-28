@@ -1,3 +1,4 @@
+import { sanitizeContent as _sanitizeContent, sanitizeTitle as _sanitizeTitle, sanitizeUrl as _sanitizeUrl } from '../utils/sanitize';
 export const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 export const IS_LOCALHOST_API = BASE_URL.includes("127.0.0.1") || BASE_URL.includes("localhost");
 export const IS_PROD = typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
@@ -57,8 +58,18 @@ const parseJsonSafely = async <T>(response: Response, fallback: T): Promise<T> =
         return fallback;
     }
 };
-
-const normalizeEvidence = (value: any): any[] => Array.isArray(value) ? value : [];
+const _cleanEvidence = (item: any): any => {
+  if (!item || typeof item !== 'object') return item;
+  const out: any = { ...item };
+  if (typeof out.title === 'string') out.title = _sanitizeTitle(out.title);
+  if (typeof out.snippet === 'string') out.snippet = _sanitizeContent(out.snippet, 500);
+  if (typeof out.content === 'string') out.content = _sanitizeContent(out.content, 800);
+  if (typeof out.source === 'string') out.source = _sanitizeTitle(out.source);
+  if (typeof out.company === 'string') out.company = _sanitizeTitle(out.company);
+  if (typeof out.url === 'string') out.url = _sanitizeUrl(out.url) || out.url;
+  return out;
+};
+const normalizeEvidence = (value: any): any[] => Array.isArray(value) ? value.map(_cleanEvidence) : [];
 
 import { QueryResponse as QueryResponseType } from '../types';
 
@@ -181,7 +192,7 @@ export const fetchSignals = async (): Promise<any[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await parseJsonSafely(response, []);
-        return Array.isArray(data) ? data : [];
+        return Array.isArray(data) ? data.map(_cleanEvidence) : [];
     } catch {
         return [];
     }
@@ -194,7 +205,7 @@ export const fetchRadar = async (): Promise<any[]> => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await parseJsonSafely(response, []);
-        return Array.isArray(data) ? data : [];
+        return Array.isArray(data) ? data.map(_cleanEvidence) : [];
     } catch {
         return [];
     }
@@ -214,7 +225,7 @@ export const formatEvidenceToContext = (evidence: any[]): string => {
     return context;
 };
 
-export const generateInsight = async (query: string, context: string): Promise<string> => {
+export const generateInsight = async (query: string, context: string, onChunk?: (chunk: string) => void): Promise<string> => {
     try {
         const response = await apiFetch(`/generate`, {
             method: "POST",
@@ -226,8 +237,38 @@ export const generateInsight = async (query: string, context: string): Promise<s
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await parseJsonSafely(response, { insight: "" });
-        return data?.insight || "Insight generation returned an empty response.";
+        
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("text/plain")) {
+            // Handle streaming text
+            if (!response.body) throw new Error("ReadableStream not yet supported in this browser.");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullText = "";
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) {
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullText += chunk;
+                    if (onChunk) onChunk(fullText);
+                }
+            }
+            // Final decode
+            const lastChunk = decoder.decode();
+            if (lastChunk) {
+                fullText += lastChunk;
+                if (onChunk) onChunk(fullText);
+            }
+            return fullText || "Insight generation returned an empty response.";
+        } else {
+            // Handle legacy JSON object response
+            const data = await parseJsonSafely(response, { insight: "" });
+            const insightText = data?.insight || "Insight generation returned an empty response.";
+            if (onChunk) onChunk(insightText);
+            return insightText;
+        }
     } catch {
         return "Insight generation unavailable. Please try again later.";
     }

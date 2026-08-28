@@ -229,6 +229,88 @@ class GeminiClient:
         logger.error(f"All Gemini models failed. Errors: {'; '.join(errors)}")
         return "Insight generation unavailable. Please try again later."
 
+    async def _generate_stream_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None):
+        """
+        Generate content stream. Yields text chunks.
+        """
+        clean_name = model_name.replace("models/", "") if model_name.startswith("models/") else model_name
+
+        if NEW_SDK and self.client is not None:
+            try:
+                config_kwargs = {}
+                if response_schema:
+                    config_kwargs["response_mime_type"] = "application/json"
+                    config_kwargs["response_schema"] = response_schema
+                
+                config = genai_types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
+
+                response = await asyncio.wait_for(
+                    self.client.aio.models.generate_content_stream(
+                        model=clean_name,
+                        contents=prompt,
+                        config=config
+                    ),
+                    timeout=timeout,
+                )
+                async for chunk in response:
+                    text = getattr(chunk, "text", str(chunk))
+                    if text:
+                        yield text
+                return
+            except Exception as e:
+                logger.warning(f"New SDK stream failed for {clean_name}: {e}, trying legacy if available")
+                if not LEGACY_AVAILABLE:
+                    raise
+
+        if LEGACY_AVAILABLE:
+            model = genai_legacy.GenerativeModel(model_name)
+            kwargs = {}
+            if response_schema:
+                import google.generativeai.types as legacy_types
+                kwargs["generation_config"] = legacy_types.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=response_schema
+                )
+            # Legacy async streaming
+            response = await asyncio.wait_for(
+                model.generate_content_async(prompt, stream=True, **kwargs),
+                timeout=timeout,
+            )
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+            return
+
+        raise RuntimeError("No Gemini SDK available for generation")
+
+    async def generate_content_stream_with_fallback(self, prompt: str, response_schema=None):
+        """
+        Generate content stream using available models.
+        """
+        if not self.available_models:
+            yield "Insight generation unavailable: No Gemini models found."
+            return
+
+        errors = []
+
+        for model_name in self.available_models:
+            try:
+                logger.info(f"Attempting stream generation with model: {model_name}")
+                async for chunk in self._generate_stream_with_timeout(model_name, prompt, response_schema=response_schema):
+                    yield chunk
+                return
+            except Exception as e:
+                error_str = str(e)
+                logger.warning(f"Model {model_name} failed: {error_str}")
+                if "429" in error_str or "Quota exceeded" in error_str:
+                    errors.append(f"{model_name}: Rate Limit")
+                    continue
+                errors.append(f"{model_name}: {error_str}")
+                continue
+
+        logger.error(f"All Gemini models failed. Errors: {'; '.join(errors)}")
+        yield "Insight generation unavailable. Please try again later."
+
     def list_available_models(self) -> list[dict]:
         """List available models and their methods."""
         try:

@@ -1,6 +1,7 @@
 """
-Chroma vector store for SiliconPulse signals.
-Persistent collection stored in data/chroma. Graceful no-op when unavailable.
+Vector store facade for SiliconPulse signals.
+Tries Supabase pgvector first (persistent, shared), falls back to Chroma (local file).
+Graceful no-op when both unavailable.
 """
 from __future__ import annotations
 
@@ -11,6 +12,15 @@ from pathlib import Path
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Try pgvector first
+try:
+    from . import pgvector_store as _pg  # type: ignore
+
+    _PG_AVAILABLE = None  # lazy check
+except ImportError:
+    _pg = None  # type: ignore
+    _PG_AVAILABLE = False
 
 _collection = None
 _lock = threading.Lock()
@@ -44,14 +54,42 @@ def _get_collection():
     return _collection
 
 
+def _pg_available() -> bool:
+    global _PG_AVAILABLE
+    if _PG_AVAILABLE is not None:
+        return bool(_PG_AVAILABLE)
+    if _pg is None:
+        _PG_AVAILABLE = False
+        return False
+    try:
+        ok = _pg.is_available()
+        _PG_AVAILABLE = ok
+        return ok
+    except Exception:
+        _PG_AVAILABLE = False
+        return False
+
+
 def is_available() -> bool:
+    if _pg_available():
+        return True
     return _get_collection() is not None
 
 
 def upsert_signals(events: list[dict], embeddings: list[list[float]]) -> int:
-    """Upsert events with embeddings. Returns count added."""
+    """Upsert events with embeddings. Returns count added. Tries pgvector first, then Chroma."""
+    if not events or not embeddings:
+        return 0
+    # Try pgvector
+    if _pg_available():
+        try:
+            n = _pg.upsert_signals(events, embeddings)
+            if n:
+                return n
+        except Exception as e:
+            logger.debug(f"pgvector upsert failed, falling back to Chroma: {e}")
     coll = _get_collection()
-    if coll is None or not events or not embeddings:
+    if coll is None:
         return 0
     try:
         ids, docs, metas, vecs = [], [], [], []
@@ -86,9 +124,19 @@ def upsert_signals(events: list[dict], embeddings: list[list[float]]) -> int:
 def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
     """
     Query similar signals. Returns list of dicts with metadata + distance + event payload.
+    Tries pgvector first, then Chroma.
     """
+    if not query_embedding:
+        return []
+    if _pg_available():
+        try:
+            res = _pg.query_similar(query_embedding, k=k)
+            if res:
+                return res
+        except Exception as e:
+            logger.debug(f"pgvector query failed, falling back: {e}")
     coll = _get_collection()
-    if coll is None or not query_embedding:
+    if coll is None:
         return []
     try:
         res = coll.query(query_embeddings=[query_embedding], n_results=min(k, coll.count() or 1))
@@ -110,6 +158,13 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
 
 
 def count() -> int:
+    if _pg_available():
+        try:
+            n = _pg.count()
+            if n >= 0:
+                return n
+        except Exception:
+            pass
     coll = _get_collection()
     if coll is None:
         return 0

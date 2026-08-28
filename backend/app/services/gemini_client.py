@@ -132,7 +132,7 @@ class GeminiClient:
         retry=retry_if_exception_type(Exception),
         reraise=True,
     )
-    async def _generate_with_timeout(self, model_name: str, prompt: str, timeout: int = 10) -> str:
+    async def _generate_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None) -> str:
         """
         Generate content with strict timeout and retries.
         Supports both new and legacy SDKs.
@@ -143,10 +143,18 @@ class GeminiClient:
         if NEW_SDK and self.client is not None:
             # New SDK: use aio client
             try:
+                config_kwargs = {}
+                if response_schema:
+                    config_kwargs["response_mime_type"] = "application/json"
+                    config_kwargs["response_schema"] = response_schema
+                
+                config = genai_types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
+
                 response = await asyncio.wait_for(
                     self.client.aio.models.generate_content(
                         model=clean_name,
                         contents=prompt,
+                        config=config
                     ),
                     timeout=timeout,
                 )
@@ -157,8 +165,16 @@ class GeminiClient:
                 logger.warning(f"New SDK generate failed for {clean_name}: {e}, trying legacy if available")
                 if LEGACY_AVAILABLE:
                     model = genai_legacy.GenerativeModel(model_name)
+                    kwargs = {}
+                    if response_schema:
+                        import google.generativeai.types as legacy_types
+                        kwargs["generation_config"] = legacy_types.GenerationConfig(
+                            response_mime_type="application/json",
+                            response_schema=response_schema
+                        )
+                    
                     response = await asyncio.wait_for(
-                        model.generate_content_async(prompt),
+                        model.generate_content_async(prompt, **kwargs),
                         timeout=timeout,
                     )
                     return response.text
@@ -166,15 +182,22 @@ class GeminiClient:
 
         if LEGACY_AVAILABLE:
             model = genai_legacy.GenerativeModel(model_name)
+            kwargs = {}
+            if response_schema:
+                import google.generativeai.types as legacy_types
+                kwargs["generation_config"] = legacy_types.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=response_schema
+                )
             response = await asyncio.wait_for(
-                model.generate_content_async(prompt),
+                model.generate_content_async(prompt, **kwargs),
                 timeout=timeout,
             )
             return response.text
 
         raise RuntimeError("No Gemini SDK available for generation")
 
-    async def generate_content_with_fallback(self, prompt: str) -> str:
+    async def generate_content_with_fallback(self, prompt: str, response_schema=None) -> str:
         """
         Generate content using available models, falling back if one is rate limited.
         """
@@ -186,7 +209,7 @@ class GeminiClient:
         for model_name in self.available_models:
             try:
                 logger.info(f"Attempting generation with model: {model_name}")
-                return await self._generate_with_timeout(model_name, prompt)
+                return await self._generate_with_timeout(model_name, prompt, response_schema=response_schema)
             except Exception as e:
                 error_str = str(e)
                 logger.warning(f"Model {model_name} failed: {error_str}")

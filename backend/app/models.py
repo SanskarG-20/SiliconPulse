@@ -104,3 +104,22 @@ class SourceVerifyResponse(BaseModel):
     """Response model for source verification"""
     query: str = Field(..., description="The query being verified")
     sources: list[SourceVerifyItem] = Field(..., description="List of verified sources")
+
+
+class ReportEvidence(BaseModel):
+    source: str
+    timestamp: str
+    title: str
+
+class ReportSection(BaseModel):
+    id: str = Field(description="Section ID like 'evidence', 'change', 'impact', 'competitors', 'outlook', 'confidence', 'ceo'")
+    title: str = Field(description="Display title for the section")
+    points: Optional[list[str]] = Field(default=None, description="Bullet points for the section")
+    text: Optional[str] = Field(default=None, description="Paragraph text (used mainly for 'ceo' section)")
+    value: Optional[str] = Field(default=None, description="Value (e.g., 'Low', 'Medium', 'High' for confidence)")
+    reason: Optional[str] = Field(default=None, description="Reasoning text")
+    evidence: Optional[list[ReportEvidence]] = Field(default=None, description="List of evidence items")
+
+class InsightReport(BaseModel):
+    sections: list[ReportSection]
+

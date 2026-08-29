@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # External news providers (free APIs)
     newsapi_api_key: str = ""
+    youtube_api_key: str = ""  # YouTube Data API v3 key for Intelligence Videos
     redis_url: str = ""  # optional: redis://... for distributed rate limiting
 
     # Distributed workers (1M+ events/day)

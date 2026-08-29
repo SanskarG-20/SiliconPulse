@@ -109,6 +109,52 @@
         }
         html.light-theme body { background: #F1F5F9; color: #0F172A; }
         html.light-theme .glass { background: rgba(255,255,255,0.9); border-color: #E2E8F0; }
+
+        /* Global light theme overrides for hardcoded dark tailwind classes */
+        html.light-theme [class*="bg-slate-950"],
+        html.light-theme [class*="bg-[#0B1220]"],
+        html.light-theme [class*="bg-[#020617]"],
+        html.light-theme [class*="bg-[#050B1A]"] {
+            background-color: rgba(255, 255, 255, 0.75) !important;
+        }
+        html.light-theme [class*="bg-slate-900"] {
+            background-color: rgba(248, 250, 252, 0.85) !important;
+        }
+        html.light-theme [class*="bg-slate-800"] {
+            background-color: rgba(241, 245, 249, 0.9) !important;
+        }
+        html.light-theme [class*="bg-slate-700"] {
+            background-color: #e2e8f0 !important;
+        }
+        html.light-theme [class*="text-slate-100"],
+        html.light-theme [class*="text-slate-200"],
+        html.light-theme [class*="text-slate-300"],
+        html.light-theme [class*="text-slate-400"],
+        html.light-theme [class*="text-[#94A3B8]"] {
+            color: #0f172a !important;
+        }
+        html.light-theme [class*="text-slate-500"] {
+            color: #475569 !important;
+        }
+        html.light-theme [class*="border-slate-800"],
+        html.light-theme [class*="border-slate-700"],
+        html.light-theme [class*="border-[#1E293B]"] {
+            border-color: #cbd5e1 !important;
+        }
+        
+        /* Specific overrides for GraphExplorer SVG */
+        html.light-theme svg rect[fill="#0B1220"],
+        html.light-theme svg rect[fill="#020617"] {
+            fill: rgba(255, 255, 255, 0.8) !important;
+        }
+        html.light-theme svg text[fill="#94A3B8"],
+        html.light-theme svg text[fill="#F1F5F9"],
+        html.light-theme svg text[fill="white"] {
+            fill: #0f172a !important;
+        }
+        html.light-theme svg text[fill="#64748B"] {
+            fill: #334155 !important;
+        }
     </style>
 </head>
 <body>

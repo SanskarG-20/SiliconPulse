@@ -9,9 +9,12 @@ from ..company_dict import COMPANY_DICT
 from ..settings import settings
 from ..utils import (
     classify_event_type,
+    clean_url,
     deduplicate_and_append,
     get_current_timestamp,
     get_primary_company,
+    sanitize_content,
+    sanitize_title,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,16 +121,17 @@ def pull_gdelt_signals(max_articles: int = 50) -> int:
                         if last_checkpoint and timestamp <= last_checkpoint:
                             continue
 
-                        title = article.get("title", "")
-                        content = article.get("pubdate", "")  # GDELT returns limited content
-                        url = article.get("url", "")
-
-                        if not title:
+                        raw_title = article.get("title", "")
+                        if not raw_title:
                             continue
+                        title = sanitize_title(raw_title)
+                        raw_content = article.get("pubdate", "") or f"Source: {article.get('sourcecountry', 'Unknown')}"
+                        content = sanitize_content(raw_content, max_len=500)
+                        url = clean_url(article.get("url", "")) or article.get("url", "")
 
                         event = {
                             "title": title,
-                            "content": content or f"Source: {article.get('sourcecountry', 'Unknown')}",
+                            "content": content,
                             "timestamp": timestamp,
                             "source": "GDELT",
                             "url": url,

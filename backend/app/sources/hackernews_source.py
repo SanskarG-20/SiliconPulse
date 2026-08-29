@@ -7,9 +7,13 @@ from .. import storage
 from ..settings import settings
 from ..utils import (
     classify_event_type,
+    clean_url,
     deduplicate_and_append,
+    extract_primary_url,
     get_current_timestamp,
     get_primary_company,
+    sanitize_content,
+    sanitize_title,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,24 +95,32 @@ def pull_hn_signals(max_stories: int = 100) -> int:
                         if last_checkpoint and created_at <= last_checkpoint:
                             continue
 
-                        title = story.get("title", "")
-                        if not title:
+                        raw_title = story.get("title", "")
+                        if not raw_title:
                             continue
+                        title = sanitize_title(raw_title)
 
-                        # Get story content
-                        # HackerNews via Algolia has limited content; use URL as reference
+                        # Get story content — Algolia story_text is HTML-escaped with tracking URLs
                         story_url = story.get("url", f"https://news.ycombinator.com/item?id={story_id}")
-                        story_text = story.get("story_text", "") or ""
+                        story_url = clean_url(story_url) or story_url
+                        # Extract primary URL: prefer story_url, fallback to first href in story_text
+                        raw_story_text = story.get("story_text", "") or ""
+                        story_text = sanitize_content(raw_story_text, max_len=500)
+                        if not story_text:
+                            story_text = f"From {story.get('author', 'HN')} on HackerNews"
+                        # If sanitized text is still empty (e.g., only URLs), keep at least the URL host
+                        content = story_text
 
-                        # Construct event
-                        content = story_text[:500] if story_text else f"From {story.get('author', 'HN')} on HackerNews"
+                        # Use cleaned URL for View source — ensure it is the story's canonical URL without tracking
+                        url = extract_primary_url(raw_story_text, story_url) or story_url
+                        url = clean_url(url) or story_url
 
                         event = {
                             "title": title,
                             "content": content,
                             "timestamp": created_at,
                             "source": "HackerNews",
-                            "url": story_url,
+                            "url": url,
                             "company": map_company_from_text(title + " " + content),
                             "event_type": classify_event_type(title, content)
                         }

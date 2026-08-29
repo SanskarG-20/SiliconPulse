@@ -26,23 +26,36 @@ class LLMEvent(BaseModel):
     timestamp: str = Field(default="", description="Timestamp if available")
     url: str = Field(default="", description="URL if available")
 
+class LLMGraphEdge(BaseModel):
+    source: str = Field(description="Source company")
+    target: str = Field(description="Target company")
+    relation: str = Field(description="Relationship type, e.g., supplies, manufactures, equips, invests")
+    weight: float = Field(default=1.0, description="Confidence or impact weight 0.0-1.0")
+    details: str = Field(default="", description="Brief details about the relationship")
+
 class LLMExtractionResult(BaseModel):
     events: list[LLMEvent]
+    edges: list[LLMGraphEdge] = Field(default_factory=list, description="Extracted supply chain relationships")
 
 EXTRACTION_PROMPT_TEMPLATE = """
 You are SiliconPulse, an expert financial intelligence extractor for semiconductor & AI supply chain.
 
-TASK: Extract structured events from the following document text.
+TASK: Extract structured events and supply chain relationships (edges) from the following document text.
 
 DOCUMENT TEXT (truncated to {trunc_len} chars):
 ---
 {text}
 ---
 
-INSTRUCTIONS:
+INSTRUCTIONS for EVENTS:
 - Extract ALL distinct events that are material to semiconductor, AI, or tech supply chain.
 - Focus especially on: earnings, revenue, guidance, capex, yield, capacity, fab, supply, foundry, acquisition, merger, product launch, contract, partnership.
 - If no material events, return an empty events list.
+
+INSTRUCTIONS for EDGES:
+- Identify any stated supply chain relationships, partnerships, or investments between companies (e.g. ASML supplies TSMC, TSMC manufactures for NVIDIA).
+- Return them as edges with source, target, relation, weight, and details.
+- If no relationships are found, return an empty edges list.
 """
 
 
@@ -50,18 +63,18 @@ async def extract_events_from_text(
     text: str,
     source: str = "LLMExtractor",
     max_events: int = 5,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     """
-    Extract structured events from raw text via Gemini.
-    Returns list of event dicts compatible with deduplicate_and_append.
-    Gracefully returns [] if no key or on failure.
+    Extract structured events and edges from raw text via Gemini.
+    Returns (events, edges).
+    Gracefully returns ([], []) if no key or on failure.
     """
     if not text or not text.strip():
-        return []
+        return [], []
 
     if not settings.gemini_api_key:
         logger.warning("LLM extraction skipped: no GEMINI_API_KEY")
-        return []
+        return [], []
 
     # Truncate to fit context window
     trunc_len = 8000
@@ -76,13 +89,16 @@ async def extract_events_from_text(
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning(f"LLM extraction invalid JSON: {raw[:500]}")
-            return []
+            return [], []
 
         events_data = data.get("events", [])
         if not isinstance(events_data, list):
             logger.warning(f"LLM extraction expected list in 'events', got {type(events_data)}")
-            return []
+            events_data = []
 
+        edges_data = data.get("edges", [])
+        if not isinstance(edges_data, list):
+            edges_data = []
 
         events = []
         for item in events_data[:max_events]:
@@ -121,18 +137,34 @@ async def extract_events_from_text(
                 }
             )
 
-        logger.info(f"LLM extracted {len(events)} events from {len(truncated)} chars")
-        return events
+        edges = []
+        for item in edges_data[:max_events]:
+            if not isinstance(item, dict):
+                continue
+            source_c = str(item.get("source", "")).strip()
+            target_c = str(item.get("target", "")).strip()
+            relation = str(item.get("relation", "")).strip()
+            if source_c and target_c and relation:
+                edges.append({
+                    "source": source_c,
+                    "target": target_c,
+                    "relation": relation,
+                    "weight": float(item.get("weight", 1.0)),
+                    "details": str(item.get("details", "")).strip()
+                })
+
+        logger.info(f"LLM extracted {len(events)} events and {len(edges)} edges from {len(truncated)} chars")
+        return events, edges
 
     except Exception as e:
         logger.warning(f"LLM extraction failed: {e}")
-        return []
+        return [], []
 
 
 async def extract_events_batch(
     texts: list[str], source: str = "LLMExtractor"
 ) -> list[dict]:
-    """Extract events from multiple texts in parallel (best-effort)."""
+    """Extract events from multiple texts in parallel (best-effort). Returns only events."""
     import asyncio
 
     results = await asyncio.gather(
@@ -140,8 +172,8 @@ async def extract_events_batch(
     )
     all_events: list[dict] = []
     for r in results:
-        if isinstance(r, list):
-            all_events.extend(r)
+        if isinstance(r, tuple) and len(r) == 2:
+            all_events.extend(r[0])
         elif isinstance(r, Exception):
             logger.warning(f"Batch extraction item failed: {r}")
     return all_events

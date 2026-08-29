@@ -11,8 +11,11 @@ import httpx
 from ..settings import settings
 from ..utils import (
     classify_event_type,
+    clean_url,
     deduplicate_and_append,
     extract_companies,
+    sanitize_content,
+    sanitize_title,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,9 +53,12 @@ def _now_iso() -> str:
 
 
 def _normalize(article: dict) -> dict:
-    title = article.get("title") or ""
-    snippet = article.get("snippet") or ""
-    url = article.get("url") or ""
+    raw_title = article.get("title") or ""
+    raw_snippet = article.get("snippet") or ""
+    raw_url = article.get("url") or ""
+    title = sanitize_title(raw_title)
+    snippet = sanitize_content(raw_snippet, max_len=500)
+    url = clean_url(raw_url) or raw_url
     source = article.get("source") or "Unknown"
     timestamp = article.get("timestamp") or _now_iso()
     text = f"{title} {snippet}".strip()

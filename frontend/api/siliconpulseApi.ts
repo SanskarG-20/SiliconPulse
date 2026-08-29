@@ -414,3 +414,20 @@ export const triggerSecIngest = async (daysBack: number = 3): Promise<any> => {
     }
     return parseJsonSafely(response, {});
 };
+
+export const fetchVideos = async (query?: string, category: string = "all", limit: number = 8): Promise<any[]> => {
+    try {
+        const params = new URLSearchParams();
+        if (query) params.append('query', query);
+        params.append('category', category);
+        params.append('limit', limit.toString());
+        
+        const response = await apiFetch(`/videos?${params.toString()}`);
+        if (!response.ok) return [];
+        const data = await parseJsonSafely(response, { videos: [] });
+        return (data as any)?.videos || [];
+    } catch (err) {
+        console.warn("fetchVideos error:", err);
+        return [];
+    }
+};

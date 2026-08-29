@@ -12,6 +12,7 @@ import { VerifyModal } from '../modals/VerifyModal';
 import { DigestModal } from '../modals/DigestModal';
 import { MobileDrawer } from '../modals/MobileDrawer';
 import { PdfUploadModal } from '../modals/PdfUploadModal';
+import { IntelligenceVideos } from '../IntelligenceVideos';
 import { useDashboard } from '../../hooks/useDashboard';
 
 const Dashboard: React.FC = () => {
@@ -264,6 +265,8 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
             </div>
+
+            <IntelligenceVideos lastSubmittedQuery={lastSubmittedQuery} />
 
             <QueryZone
               queryResult={queryResult}

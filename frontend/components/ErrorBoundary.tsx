@@ -27,14 +27,14 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-          <div className="max-w-md w-full bg-[#020617] border border-red-500/20 rounded-2xl p-8 shadow-2xl text-center space-y-6">
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950 p-4">
+          <div className="max-w-md w-full bg-slate-50 dark:bg-[#020617] border border-red-500/20 rounded-2xl p-8 shadow-2xl text-center space-y-6">
             <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto text-red-500">
               <AlertCircle size={32} />
             </div>
             <div>
               <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">System Failure</h2>
-              <p className="text-sm text-slate-400 font-medium">
+              <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
                 The frontend node encountered a critical rendering exception.
               </p>
               {this.state.error && (

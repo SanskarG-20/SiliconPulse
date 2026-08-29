@@ -14,14 +14,14 @@ export const LiveTicker: React.FC<LiveTickerProps> = ({ events }) => {
   if (safeEvents.length === 0) return null;
 
   return (
-    <div className="w-full bg-[#050B1A] border-y border-[#1C3553]/50 h-[36px] overflow-hidden flex items-center relative z-30">
+    <div className="w-full bg-white dark:bg-[#050B1A] border-y border-[#1C3553]/50 h-[36px] overflow-hidden flex items-center relative z-30">
       {/* Oscilloscope trace bg */}
       <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
         backgroundImage: `repeating-linear-gradient(90deg, #22D3EE 0 1px, transparent 1px 32px), linear-gradient(to bottom, transparent 49%, rgba(34,211,238,0.18) 50%, transparent 51%)`,
         backgroundSize: '32px 100%'
       }} />
       <div className="shrink-0 bg-[#22D3EE] text-[#050B1A] mono text-[10px] font-bold px-3 h-full flex items-center gap-2 tracking-[0.12em]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#050B1A] animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#050B1A] animate-pulse" />
         LIVE_PULSE
         <span className="hidden md:inline opacity-60 font-normal">• {safeEvents.length} SIGNALS</span>
       </div>

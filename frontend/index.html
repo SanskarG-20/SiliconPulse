@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,24 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body, #root { width: 100%; height: 100%; }
         :root {
+            /* Light Mode Variables */
+            --void: #F8FAFC;
+            --panel: #FFFFFF;
+            --panel-soft: rgba(255,255,255,0.84);
+            --hairline: #E2E8F0;
+            --hairline-soft: rgba(226,232,240,0.9);
+            --euv: #0284C7; /* Darker cyan/blue for better contrast in light mode */
+            --euv-soft: rgba(2,132,199,0.12);
+            --copper: #D97706; /* Darker amber for contrast */
+            --copper-soft: rgba(217,119,6,0.14);
+            --signal: #0F172A;
+            --muted: #64748B;
+            --grid: rgba(2,132,199,0.06);
+            --radius: 16px;
+        }
+        
+        html.dark {
+            /* Dark Mode Variables (Default) */
             --void: #050B1A;
             --panel: #0E1E32;
             --panel-soft: rgba(14,30,50,0.72);
@@ -24,9 +42,9 @@
             --signal: #F1F5F9;
             --muted: #94A3B8;
             --grid: rgba(34,211,238,0.06);
-            --radius: 16px;
         }
-        html { scrollbar-width: thin; scrollbar-color: #1E3A5F transparent; }
+
+        html { scrollbar-width: thin; scrollbar-color: var(--hairline) transparent; }
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--void);
@@ -34,11 +52,13 @@
             overflow: hidden;
             -webkit-font-smoothing: antialiased;
             text-rendering: optimizeLegibility;
+            transition: background-color 0.2s, color 0.2s;
         }
         /* Type scale */
         .display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
         .mono { font-family: 'JetBrains Mono', monospace; }
         .serif { font-family: 'Newsreader', serif; }
+        
         /* Glass / panel */
         .glass {
             background: var(--panel-soft);
@@ -48,24 +68,27 @@
         .glass-hover { transition: border-color 200ms, background 200ms, transform 200ms, box-shadow 200ms; }
         .glass-hover:hover {
             border-color: rgba(34,211,238,0.32);
-            background: rgba(14,30,50,0.9);
+            background: var(--panel);
             transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(2,8,23,0.4), 0 0 0 1px rgba(34,211,238,0.08);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1), 0 0 0 1px var(--euv-soft);
         }
         .hairline { border-color: var(--hairline-soft); }
+        
         /* Focus */
         :where(a, button, input, select, textarea):focus-visible {
             outline: 2px solid var(--euv);
             outline-offset: 2px;
             border-radius: 6px;
         }
+        
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1E3A5F; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #2A4A6B; }
-        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #1E3A5F transparent; }
-        /* Blueprint grid - fab reticle */
+        ::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: var(--hairline) transparent; }
+        
+        /* Blueprint grid */
         .blueprint-grid {
             background-image:
                 linear-gradient(to right, var(--grid) 1px, transparent 1px),
@@ -74,20 +97,18 @@
         }
         .blueprint-grid-fine {
             background-image:
-                linear-gradient(to right, rgba(34,211,238,0.03) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(34,211,238,0.03) 1px, transparent 1px);
+                linear-gradient(to right, var(--grid) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
             background-size: 8px 8px;
         }
+        
         /* Ticker */
         .ticker-scroll { animation: ticker 80s linear infinite; }
         @keyframes ticker {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
-        .fade-edge-x {
-            mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
-        }
-        /* Motion */
+        
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
@@ -95,67 +116,12 @@
             }
             .ticker-scroll { animation: none; }
         }
-        /* Light theme - keep dark as primary, light is secondary */
-        html.light-theme {
-            --void: #F8FAFC;
-            --panel: #FFFFFF;
-            --panel-soft: rgba(255,255,255,0.84);
-            --hairline: #E2E8F0;
-            --hairline-soft: rgba(226,232,240,0.9);
-            --signal: #0F172A;
-            --muted: #64748B;
-            background: #F1F5F9;
-            color: #0F172A;
-        }
-        html.light-theme body { background: #F1F5F9; color: #0F172A; }
-        html.light-theme .glass { background: rgba(255,255,255,0.9); border-color: #E2E8F0; }
-
-        /* Global light theme overrides for hardcoded dark tailwind classes */
-        html.light-theme [class*="bg-slate-950"],
-        html.light-theme [class*="bg-[#0B1220]"],
-        html.light-theme [class*="bg-[#020617]"],
-        html.light-theme [class*="bg-[#050B1A]"] {
-            background-color: rgba(255, 255, 255, 0.75) !important;
-        }
-        html.light-theme [class*="bg-slate-900"] {
-            background-color: rgba(248, 250, 252, 0.85) !important;
-        }
-        html.light-theme [class*="bg-slate-800"] {
-            background-color: rgba(241, 245, 249, 0.9) !important;
-        }
-        html.light-theme [class*="bg-slate-700"] {
-            background-color: #e2e8f0 !important;
-        }
-        html.light-theme [class*="text-slate-100"],
-        html.light-theme [class*="text-slate-200"],
-        html.light-theme [class*="text-slate-300"],
-        html.light-theme [class*="text-slate-400"],
-        html.light-theme [class*="text-[#94A3B8]"] {
-            color: #0f172a !important;
-        }
-        html.light-theme [class*="text-slate-500"] {
-            color: #475569 !important;
-        }
-        html.light-theme [class*="border-slate-800"],
-        html.light-theme [class*="border-slate-700"],
-        html.light-theme [class*="border-[#1E293B]"] {
-            border-color: #cbd5e1 !important;
-        }
-        
-        /* Specific overrides for GraphExplorer SVG */
-        html.light-theme svg rect[fill="#0B1220"],
-        html.light-theme svg rect[fill="#020617"] {
-            fill: rgba(255, 255, 255, 0.8) !important;
-        }
-        html.light-theme svg text[fill="#94A3B8"],
-        html.light-theme svg text[fill="#F1F5F9"],
-        html.light-theme svg text[fill="white"] {
-            fill: #0f172a !important;
-        }
-        html.light-theme svg text[fill="#64748B"] {
-            fill: #334155 !important;
-        }
     </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
 </head>
 <body>
     <div id="root"></div>

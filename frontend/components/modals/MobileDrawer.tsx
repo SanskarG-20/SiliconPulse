@@ -27,11 +27,11 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-[110] lg:hidden animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose}></div>
-      <div className="absolute inset-y-0 left-0 w-72 sm:w-80 bg-[#020617] border-r border-slate-800 p-4 sm:p-6 space-y-8 animate-in slide-in-from-left duration-300">
+      <div className="absolute inset-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md" onClick={onClose}></div>
+      <div className="absolute inset-y-0 left-0 w-72 sm:w-80 bg-slate-50 dark:bg-[#020617] border-r border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-8 animate-in slide-in-from-left duration-300">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">Command Center</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-white">
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-900 dark:hover:text-white">
             <X size={20} />
           </button>
         </div>
@@ -49,12 +49,12 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
           </h3>
           <div className="space-y-3">
             {filteredFeed.filter(f => f.impactScore > 80).slice(0, 3).map(ev => (
-              <div key={ev.id} className="glass p-3 rounded-xl border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
+              <div key={ev.id} className="glass p-3 rounded-xl border-slate-200/50 dark:border-slate-800/50 hover:border-sky-500/30 transition-all cursor-pointer group">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[9px] font-mono text-sky-500">{getRelativeTimeLabel(ev.timestamp)}</span>
                   <span className="px-1.5 py-0.5 rounded-[4px] bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">Critical</span>
                 </div>
-                <h4 title={ev.title} className="text-xs font-bold text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1 truncate">{ev.title}</h4>
+                <h4 title={ev.title} className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-sky-400 leading-tight transition-colors mb-1 truncate">{ev.title}</h4>
                 <div className="flex items-center text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                   <span>{ev.company}</span>
                   <span className="mx-1.5 opacity-20">|</span>

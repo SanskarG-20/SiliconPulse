@@ -1,4 +1,5 @@
 import { LiveEvent } from '../types';
+import { sanitizeContent, sanitizeTitle, sanitizeUrl } from './sanitize';
 
 const normalizeText = (value?: string | null): string => (value ?? '').toString().trim();
 
@@ -111,23 +112,30 @@ const avoidConsecutiveSources = (events: LiveEvent[]): LiveEvent[] => {
 };
 
 export const createLiveEvent = (raw: any, index: number): LiveEvent => {
-  const title = normalizeText(raw?.title)
-    || normalizeText(raw?.snippet)
-    || normalizeText(raw?.content)
-    || 'Untitled Signal';
+  const rawTitle = raw?.title ?? raw?.snippet ?? raw?.content ?? 'Untitled Signal';
+  const title = sanitizeTitle(normalizeText(rawTitle)) || 'Untitled Signal';
 
   const timestamp = normalizeText(raw?.timestamp) || new Date().toISOString();
+
+  const rawSnippet = raw?.snippet ?? raw?.content ?? '';
+  const snippet = sanitizeContent(normalizeText(rawSnippet), 500);
+
+  const rawContent = raw?.content ?? raw?.snippet ?? title;
+  const content = sanitizeContent(normalizeText(rawContent), 1200);
+
+  const rawUrl = raw?.url ?? '';
+  const url = sanitizeUrl(normalizeText(rawUrl));
 
   return {
     id: raw?.event_id ? `event-${raw.event_id}` : `api-${timestamp}-${index}`,
     timestamp,
-    source: normalizeText(raw?.source) || 'Unknown',
+    source: sanitizeTitle(normalizeText(raw?.source) || 'Unknown'),
     title,
-    snippet: normalizeText(raw?.snippet) || normalizeText(raw?.content) || '',
-    url: normalizeText(raw?.url) || '',
-    content: normalizeText(raw?.content) || normalizeText(raw?.snippet) || title,
+    snippet: snippet || content,
+    url,
+    content: content || snippet || title,
     impactScore: typeof raw?.impactScore === 'number' ? raw.impactScore : 50,
-    company: normalizeText(raw?.company) || 'Unknown',
+    company: sanitizeTitle(normalizeText(raw?.company) || 'Unknown'),
   };
 };
 

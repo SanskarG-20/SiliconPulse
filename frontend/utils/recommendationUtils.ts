@@ -159,13 +159,13 @@ const CATEGORY_POOLS: CategoryPool[] = [
   {
     key: 'enterpriseTech',
     icon: 'Layers',
-    color: 'text-slate-300',
+    color: 'text-slate-700 dark:text-slate-300',
     templates: [
       (company) => ({
         label: 'Enterprise Signal Check',
         query: `Enterprise tech moves: cloud spend shifts, platform wins, or security signals tied to ${company ?? 'major vendors'}?`,
         icon: 'Layers',
-        color: 'text-slate-300',
+        color: 'text-slate-700 dark:text-slate-300',
         category: 'enterpriseTech',
       }),
     ],

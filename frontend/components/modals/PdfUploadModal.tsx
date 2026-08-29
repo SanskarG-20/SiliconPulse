@@ -86,13 +86,13 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#020617] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
-        <button onClick={handleClose} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-slate-50 dark:bg-[#020617] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
+        <button onClick={handleClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900 dark:hover:text-white">
           <X size={18} />
         </button>
 
-        <div className="p-6 border-b border-slate-800/50">
+        <div className="p-6 border-b border-slate-200/50 dark:border-slate-800/50">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-sky-500/10 rounded-lg text-sky-500">
               <Upload size={18} />
@@ -110,20 +110,20 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({ isOpen, onClose,
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
-            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${dragOver ? 'border-sky-500 bg-sky-500/10' : 'border-slate-800 bg-slate-900/30 hover:border-slate-700'}`}
+            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${dragOver ? 'border-sky-500 bg-sky-500/10' : 'border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 hover:border-slate-300 dark:border-slate-700'}`}
           >
             <FileText size={28} className={`mx-auto mb-2 ${file ? 'text-emerald-400' : 'text-slate-600'}`} />
             {file ? (
               <div>
-                <p className="text-sm font-bold text-slate-200">{file.name}</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{file.name}</p>
                 <p className="text-[11px] text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
-                <button onClick={() => setFile(null)} className="mt-2 text-[11px] text-slate-400 hover:text-white underline">Remove</button>
+                <button onClick={() => setFile(null)} className="mt-2 text-[11px] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline">Remove</button>
               </div>
             ) : (
               <>
-                <p className="text-sm font-bold text-slate-300">Drag & drop PDF here</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Drag & drop PDF here</p>
                 <p className="text-[11px] text-slate-500">or</p>
-                <label className="mt-2 inline-flex px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-bold cursor-pointer">
+                <label className="mt-2 inline-flex px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded text-xs font-bold cursor-pointer">
                   Browse Files
                   <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </label>
@@ -150,7 +150,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({ isOpen, onClose,
                 {result.extracted_events !== undefined && <div>Extracted: {result.extracted_events} events</div>}
                 {result.added !== undefined && <div>Added: {result.added} new signals</div>}
                 {result.fetched !== undefined && <div>Fetched filings: {result.fetched}</div>}
-                {result.message && <div className="text-slate-400">{result.message}</div>}
+                {result.message && <div className="text-slate-600 dark:text-slate-400">{result.message}</div>}
               </div>
             </div>
           )}
@@ -166,7 +166,7 @@ export const PdfUploadModal: React.FC<PdfUploadModalProps> = ({ isOpen, onClose,
             <button
               onClick={onSec}
               disabled={secLoading}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-lg text-xs font-bold flex items-center space-x-1"
+              className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold flex items-center space-x-1"
             >
               {secLoading ? <RefreshCw size={12} className="animate-spin" /> : null}
               <span>Fetch 8-K (3d)</span>

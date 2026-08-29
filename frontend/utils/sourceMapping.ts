@@ -245,16 +245,16 @@ export const SOURCE_MAPPING: Record<string, SourceConfig> = {
   // Fallback for unknown sources
   'Unknown': {
     label: 'UNKNOWN',
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-800',
-    borderColor: 'border-slate-700',
+    color: 'text-slate-600 dark:text-slate-400',
+    bgColor: 'bg-slate-100 dark:bg-slate-800',
+    borderColor: 'border-slate-300 dark:border-slate-700',
     trustLevel: 'Low',
   },
   'unknown': {
     label: 'UNKNOWN',
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-800',
-    borderColor: 'border-slate-700',
+    color: 'text-slate-600 dark:text-slate-400',
+    bgColor: 'bg-slate-100 dark:bg-slate-800',
+    borderColor: 'border-slate-300 dark:border-slate-700',
     trustLevel: 'Low',
   },
 };

@@ -23,10 +23,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-[#020617] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
-        <div className="p-4 md:p-6 border-b border-slate-800/50">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-slate-50 dark:bg-[#020617] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={20} /></button>
+        <div className="p-4 md:p-6 border-b border-slate-200/50 dark:border-slate-800/50">
           <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center">
             <BarChart3 size={20} className="mr-2 text-sky-500" /> Export Analysis
           </h3>
@@ -41,7 +41,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() => setFormat(fmt)}
                   className={`p-3 rounded-lg border text-sm font-bold uppercase tracking-widest transition-all ${format === fmt
                     ? 'bg-sky-500/20 border-sky-500 text-sky-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'
+                    : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:border-slate-700'
                     }`}
                 >
                   .{fmt}
@@ -50,15 +50,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 p-3 bg-slate-900/50 border border-slate-800 rounded-xl">
+          <div className="flex items-center space-x-3 p-3 bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl">
             <input
               type="checkbox"
               id="includeEvidence"
               checked={includeEvidence}
               onChange={(e) => setIncludeEvidence(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-sky-500 focus:ring-sky-500/50"
+              className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-sky-500 focus:ring-sky-500/50"
             />
-            <label htmlFor="includeEvidence" className="text-xs font-bold text-slate-300 cursor-pointer">Include evidence items in report</label>
+            <label htmlFor="includeEvidence" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">Include evidence items in report</label>
           </div>
 
           <button

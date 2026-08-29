@@ -196,7 +196,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
 
     // Background grid rect
     g.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#premiumGrid)').attr('opacity', 0.18).lower();
-    g.append('rect').attr('width', width).attr('height', height).attr('fill', 'none').attr('stroke', '#0F172A').attr('stroke-width', 0).lower();
+    g.append('rect').attr('width', width).attr('height', height).attr('fill', 'none').attr('stroke', 'var(--hairline)').attr('stroke-width', 0).lower();
 
     // Subtle vignette
     const vignette = defs.append('radialGradient').attr('id', 'vignette').attr('cx', '50%').attr('cy', '50%').attr('r', '75%');
@@ -272,7 +272,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       .append('rect')
       .attr('rx', 7)
       .attr('ry', 7)
-      .attr('fill', '#0F172A')
+      .attr('fill', 'var(--void)')
       .attr('stroke', '#1E293B')
       .attr('stroke-width', 0.9)
       .attr('height', 13)
@@ -285,7 +285,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       .attr('font-weight', '600')
       .attr('font-family', 'Inter, ui-sans-serif, system-ui')
       .attr('letter-spacing', '0.02em')
-      .attr('fill', '#94A3B8')
+      .attr('fill', 'var(--muted)')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('y', 0.5)
@@ -344,7 +344,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       .attr('r', (d) => (d.id === 'TSMC' || d.id === 'NVIDIA' ? 4.2 : 3))
       .attr('cx', -2.2)
       .attr('cy', -2.2)
-      .attr('fill', 'white')
+      .attr('fill', 'var(--signal)')
       .attr('opacity', 0.18)
       .attr('pointer-events', 'none');
 
@@ -369,7 +369,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       .append('rect')
       .attr('rx', 6)
       .attr('ry', 6)
-      .attr('fill', '#0B1220')
+      .attr('fill', 'var(--panel)')
       .attr('stroke', '#1E293B')
       .attr('stroke-width', 0.85)
       .attr('height', 16)
@@ -382,7 +382,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       .attr('font-weight', '650')
       .attr('font-family', 'Inter, ui-sans-serif, system-ui')
       .attr('letter-spacing', '-0.01em')
-      .attr('fill', '#F1F5F9')
+      .attr('fill', 'var(--signal)')
       .attr('text-anchor', 'middle')
       .attr('y', 29)
       .text((d) => d.id);
@@ -534,12 +534,12 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
 
   if (loading) {
     return (
-      <div className={`rounded-[16px] border border-[#1E293B]/60 bg-[#0B1220]/60 backdrop-blur p-6 ${className ?? ''}`}>
-        <div className="flex items-center gap-2 text-[#64748B] text-xs">
+      <div className={`rounded-[16px] border border-slate-300/60 dark:border-[#1E293B]/60 bg-white/60 dark:bg-[#0B1220]/60 backdrop-blur p-6 ${className ?? ''}`}>
+        <div className="flex items-center gap-2 text-slate-500 dark:text-[#64748B] text-xs">
           <span className="h-2 w-2 rounded-full bg-[#38BDF8] animate-pulse" />
           <span className="uppercase tracking-[0.12em] font-semibold text-[10px]">Loading supply-chain graph…</span>
         </div>
-        <div className="mt-4 h-[480px] rounded-xl bg-[#020617]/60 border border-[#1E293B]/40 animate-pulse" />
+        <div className="mt-4 h-[480px] rounded-xl bg-slate-50/60 dark:bg-[#020617]/60 border border-slate-300/40 dark:border-[#1E293B]/40 animate-pulse" />
       </div>
     );
   }
@@ -549,7 +549,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       <div className={`rounded-[16px] border border-red-500/15 bg-red-500/[0.06] p-4 ${className ?? ''}`}>
         <div className="flex items-center justify-between gap-3">
           <p className="text-[12px] leading-relaxed text-red-300">Graph load failed: {error}</p>
-          <button onClick={fetchGraph} className="inline-flex items-center gap-1.5 rounded-full bg-[#0B1220] border border-[#1E293B] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#94A3B8] hover:text-white hover:border-[#334155] transition-colors">
+          <button onClick={fetchGraph} className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#0B1220] border border-slate-300 dark:border-[#1E293B] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white hover:border-[#334155] transition-colors">
             <RefreshCw size={12} /> Retry
           </button>
         </div>
@@ -573,13 +573,13 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
               <Sparkles size={10} /> PREMIUM
             </span>
           </h3>
-          <p className="mt-1 max-w-[560px] text-[11px] leading-relaxed text-[#64748B]">Enterprise topology • 19 verified relationships • Hover to isolate impact paths</p>
+          <p className="mt-1 max-w-[560px] text-[11px] leading-relaxed text-slate-500 dark:text-[#64748B]">Enterprise topology • 19 verified relationships • Hover to isolate impact paths</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden md:inline-flex items-center rounded-full bg-[#0B1220] border border-[#1E293B] px-2.5 py-1 text-[10px] font-medium tracking-[0.02em] text-[#64748B]">
+          <span className="hidden md:inline-flex items-center rounded-full bg-white dark:bg-[#0B1220] border border-slate-300 dark:border-[#1E293B] px-2.5 py-1 text-[10px] font-medium tracking-[0.02em] text-slate-500 dark:text-[#64748B]">
             {data.nodes.length} nodes • {data.edges.length} edges
           </span>
-          <button onClick={fetchGraph} className="inline-flex items-center gap-1.5 rounded-full bg-[#0B1220] border border-[#1E293B] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#94A3B8] hover:text-white hover:border-[#334155] hover:bg-[#0F172A] transition-colors">
+          <button onClick={fetchGraph} className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#0B1220] border border-slate-300 dark:border-[#1E293B] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white hover:border-[#334155] hover:bg-[#0F172A] transition-colors">
             <RefreshCw size={12} /> Refresh
           </button>
         </div>
@@ -588,7 +588,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
       {/* Legend — restrained */}
       <div className="flex flex-wrap gap-1.5">
         {(Object.entries(GROUP_LABEL) as [GraphNode['group'], string][]).map(([key, label]) => (
-          <span key={key} className="inline-flex items-center gap-1.5 rounded-full border border-[#1E293B] bg-[#0B1220]/70 px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em] text-[#CBD5E1]">
+          <span key={key} className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 dark:border-[#1E293B] bg-white/70 dark:bg-[#0B1220]/70 px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em] text-[#CBD5E1]">
             <span className="h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ background: GROUP_COLOR[key], color: GROUP_COLOR[key] }} />
             {label}
           </span>
@@ -600,7 +600,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({ onSelectCompany, s
 
       <div
         ref={containerRef}
-        className="group relative overflow-hidden rounded-[16px] border border-[#1E293B] bg-[#020617] shadow-[0_10px_40px_rgba(2,6,23,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]"
+        className="group relative overflow-hidden rounded-[16px] border border-slate-300 dark:border-[#1E293B] bg-slate-50 dark:bg-[#020617] shadow-[0_10px_40px_rgba(2,6,23,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]"
       >
         {/* Top hairline glow */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#38BDF8]/25 to-transparent" />

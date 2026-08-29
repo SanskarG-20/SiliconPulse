@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ feed, watchlist, onCompanyClic
       <CompanyRadar onCompanyClick={onCompanyClick} watchlist={watchlist} onToggleWatchlist={onToggleWatchlist} />
 
       <div className="space-y-3">
-        <h3 className="display text-[10px] font-semibold tracking-[0.14em] text-[#64748B] flex items-center gap-1.5">
+        <h3 className="display text-[10px] font-semibold tracking-[0.14em] text-slate-500 dark:text-[#64748B] flex items-center gap-1.5">
           <Zap size={12} className="text-[#E8A253]" />
           HIGH PRIORITY
         </h3>
@@ -39,11 +39,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ feed, watchlist, onCompanyClic
                   <span className="mono text-[10px] tracking-[0.06em] text-[#22D3EE]">{getRelativeTimeLabel(ev.timestamp)}</span>
                   <span className="px-1.5 py-0.5 rounded-[6px] bg-red-500/10 text-red-400 text-[9px] font-bold tracking-[0.08em] border border-red-500/15">CRITICAL</span>
                 </div>
-                <h4 title={ev.title} className="text-[12.5px] font-semibold leading-snug text-[#E2E8F0] group-hover:text-white line-clamp-2">
+                <h4 title={ev.title} className="text-[12.5px] font-semibold leading-snug text-[#E2E8F0] group-hover:text-slate-900 dark:hover:text-white line-clamp-2">
                   {ev.title}
                 </h4>
-                <div className="mt-1.5 flex items-center gap-1.5 mono text-[10px] tracking-[0.06em] text-[#64748B]">
-                  <span className="text-[#94A3B8] font-medium">{ev.company}</span>
+                <div className="mt-1.5 flex items-center gap-1.5 mono text-[10px] tracking-[0.06em] text-slate-500 dark:text-[#64748B]">
+                  <span className="text-slate-600 dark:text-[#94A3B8] font-medium">{ev.company}</span>
                   <span className="opacity-30">•</span>
                   <span>{ev.impactScore} IMPACT</span>
                   <span
@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ feed, watchlist, onCompanyClic
           </span>
           <span className="display text-[10px] font-semibold tracking-[0.12em] text-[#22D3EE]">ANALYST ADVISORY</span>
         </div>
-        <p className="serif text-[12.5px] leading-relaxed text-[#94A3B8] italic">
+        <p className="serif text-[12.5px] leading-relaxed text-slate-600 dark:text-[#94A3B8] italic">
           “Focus on TSMC N2 yield milestones. Early reports suggest Apple/NVIDIA bidding war for initial capacity. Cross-ref with GlobalFoundries delays.”
         </p>
       </div>

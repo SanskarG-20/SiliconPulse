@@ -82,12 +82,12 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800/60 bg-slate-950/30 backdrop-blur-sm mb-6">
+    <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white/30 dark:bg-slate-950/30 backdrop-blur-sm mb-6">
       <button
         onClick={toggleSection}
         className="flex w-full items-center justify-between p-4 text-left"
       >
-        <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+        <span className="text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">
           {showVideos ? '▾' : '▸'} Intelligence Videos
         </span>
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
@@ -105,7 +105,7 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
                 className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded transition-colors ${
                   activeCategory === cat.id
                     ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                    : 'bg-slate-900/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    : 'bg-slate-50/50 dark:bg-slate-900/50 text-slate-500 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800'
                 }`}
               >
                 {cat.label}
@@ -130,7 +130,7 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
               </span>
               <button 
                 onClick={() => loadVideos(lastSubmittedQuery, activeCategory)}
-                className="ml-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-200"
+                className="ml-2 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:text-slate-200"
               >
                 Retry
               </button>
@@ -140,7 +140,7 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
           {loading && videos.length === 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1, 2, 3].map(i => (
-                <div key={i} className="rounded-xl bg-slate-900/50 border border-slate-800 animate-pulse h-48" />
+                <div key={i} className="rounded-xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 animate-pulse h-48" />
               ))}
             </div>
           )}
@@ -153,7 +153,7 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
                   href={video.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden hover:border-sky-500/30 transition-all flex flex-col cursor-pointer"
+                  className="group rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 overflow-hidden hover:border-sky-500/30 transition-all flex flex-col cursor-pointer"
                 >
                   <div className="relative aspect-video bg-black overflow-hidden">
                     <img 
@@ -165,12 +165,12 @@ export const IntelligenceVideos: React.FC<IntelligenceVideosProps> = ({ lastSubm
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Play className="text-white fill-white" size={32} />
                     </div>
-                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 rounded text-[9px] font-mono text-slate-300">
+                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 rounded text-[9px] font-mono text-slate-700 dark:text-slate-300">
                       YouTube
                     </div>
                   </div>
                   <div className="p-3 flex-1 flex flex-col">
-                    <h4 className="text-xs font-bold text-slate-200 line-clamp-2 leading-tight mb-2 group-hover:text-sky-100">
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight mb-2 group-hover:text-sky-100">
                       {video.title}
                     </h4>
                     <div className="mt-auto flex items-center justify-between text-[10px] text-slate-500 font-medium">

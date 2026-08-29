@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-3 md:gap-5">
         <button
           onClick={onOpenMobileMenu}
-          className="lg:hidden -ml-1 p-2 text-[#94A3B8] hover:text-white transition-colors"
+          className="lg:hidden -ml-1 p-2 text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white transition-colors"
           aria-label="Open menu"
         >
           <Menu size={18} />
@@ -50,14 +50,14 @@ export const Header: React.FC<HeaderProps> = ({
                 OS v4
               </span>
             </h1>
-            <p className="hidden sm:block mono text-[9px] tracking-[0.14em] text-[#64748B] font-medium mt-0.5">FAB • SUPPLY • INTELLIGENCE</p>
+            <p className="hidden sm:block mono text-[9px] tracking-[0.14em] text-slate-500 dark:text-[#64748B] font-medium mt-0.5">FAB • SUPPLY • INTELLIGENCE</p>
           </div>
         </div>
 
         <div className="hidden md:flex items-center gap-4 pl-4 ml-1 border-l border-[#1C3553]/60">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse" />
-            <span className="mono text-[10px] tracking-[0.12em] font-semibold text-[#94A3B8]">NODES ONLINE</span>
+            <span className="mono text-[10px] tracking-[0.12em] font-semibold text-slate-600 dark:text-[#94A3B8]">NODES ONLINE</span>
           </span>
           <span className="mono text-[10px] tracking-[0.08em] text-[#475569] hidden xl:inline">LAT 12ms • RETICLE OK</span>
         </div>
@@ -72,20 +72,20 @@ export const Header: React.FC<HeaderProps> = ({
             placeholder="Filter live feed…"
             value={feedFilter}
             onChange={(e) => onFeedFilterChange(e.target.value)}
-            className="pl-7 pr-7 py-1.5 bg-[#050B1A] border border-[#1C3553]/70 rounded-full text-[12px] text-[#E2E8F0] placeholder:text-[#475569] focus:outline-none focus:border-[#22D3EE]/40 focus:bg-[#0E1E32] w-[160px] focus:w-[200px] transition-all mono"
+            className="pl-7 pr-7 py-1.5 bg-white dark:bg-[#050B1A] border border-[#1C3553]/70 rounded-full text-[12px] text-[#E2E8F0] placeholder:text-[#475569] focus:outline-none focus:border-[#22D3EE]/40 focus:bg-[#0E1E32] w-[160px] focus:w-[200px] transition-all mono"
           />
           {feedFilter && (
-            <button onClick={() => onFeedFilterChange('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#475569] hover:text-white p-0.5" aria-label="Clear filter">
+            <button onClick={() => onFeedFilterChange('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#475569] hover:text-slate-900 dark:hover:text-white p-0.5" aria-label="Clear filter">
               <X size={12} />
             </button>
           )}
         </div>
 
         <div className="hidden md:flex items-center gap-1.5">
-          <Link to="/" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-[11px] font-semibold tracking-[0.04em] text-[#94A3B8] hover:text-white hover:border-[#22D3EE]/30 hover:bg-[#122742] transition-all">
+          <Link to="/" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-[11px] font-semibold tracking-[0.04em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white hover:border-[#22D3EE]/30 hover:bg-[#122742] transition-all">
             <Home size={13} /> Home
           </Link>
-          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-[11px] font-semibold tracking-[0.04em] text-[#94A3B8] hover:text-white hover:bg-[#122742] transition-colors">
+          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-[11px] font-semibold tracking-[0.04em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white hover:bg-[#122742] transition-colors">
             <RefreshCw size={13} /> Reset
           </button>
           <button onClick={onGenerateDigest} className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#22D3EE]/10 border border-[#22D3EE]/20 text-[11px] font-semibold tracking-[0.04em] text-[#22D3EE] hover:bg-[#22D3EE]/15 hover:border-[#22D3EE]/30 transition-colors">
@@ -94,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 pl-1.5 ml-0.5 border-l border-[#1C3553]/40">
-          <button onClick={onToggleTheme} className="p-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-[#64748B] hover:text-white transition-colors" aria-label="Toggle theme">
+          <button onClick={onToggleTheme} className="p-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553]/60 text-slate-500 dark:text-[#64748B] hover:text-slate-900 dark:hover:text-white transition-colors" aria-label="Toggle theme">
             <Sun size={14} className="hidden dark:block" />
             <Moon size={14} className="block dark:hidden" />
           </button>

@@ -10,14 +10,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
   const lines = content.split('\n');
   
   return (
-    <div className="space-y-6 text-slate-300 max-w-3xl mx-auto">
+    <div className="space-y-6 text-slate-700 dark:text-slate-300 max-w-3xl mx-auto">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (trimmed === '') return <div key={idx} className="h-2"></div>;
 
         if (line.startsWith('≡ƒƒª')) {
           return (
-            <div key={idx} className="border-b border-slate-800 pb-6 mb-8">
+            <div key={idx} className="border-b border-slate-200 dark:border-slate-800 pb-6 mb-8">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest">Strategic Intelligence Report</span>
                 <span className="text-[10px] font-mono text-slate-600 uppercase">Classified / Internal Use</span>
@@ -58,12 +58,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
         if (line.startsWith('CEO Summary:')) {
           return (
-            <div key={idx} className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl mt-12 relative overflow-hidden">
+            <div key={idx} className="bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl mt-12 relative overflow-hidden">
                <div className="absolute top-0 right-0 p-3 opacity-10">
                  <Cpu size={80} />
                </div>
                <span className="font-black text-[9px] uppercase tracking-[0.3em] text-sky-500 block mb-2">Executive Summary</span>
-               <p className="text-lg font-bold text-slate-100 leading-snug relative z-10">
+               <p className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug relative z-10">
                  {line.replace('CEO Summary:', '').trim()}
                </p>
             </div>
@@ -74,10 +74,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             const scoreMatch = line.match(/\d+/);
             const score = scoreMatch ? parseInt(scoreMatch[0]) : 0;
             return (
-              <div key={idx} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div key={idx} className="bg-slate-50/30 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Signal Reliability</span>
-                  <div className="h-1 w-32 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1 w-32 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div 
                       className={`h-full transition-all duration-1000 ${score > 80 ? 'bg-emerald-500' : score > 50 ? 'bg-amber-500' : 'bg-red-500'}`} 
                       style={{ width: `${score}%` }}
@@ -93,7 +93,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           return (
             <div key={idx} className="flex items-start space-x-3 mb-2 last:mb-0">
               <div className="w-1 h-1 rounded-full bg-sky-500 mt-2 shrink-0"></div>
-              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
                 {trimmed.replace('-', '').trim()}
               </p>
             </div>
@@ -102,14 +102,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
         if (trimmed.startsWith('(A)') || trimmed.startsWith('(B)') || trimmed.startsWith('(C)')) {
           return (
-            <div key={idx} className="ml-4 pl-4 border-l border-slate-800 py-1 mb-2">
+            <div key={idx} className="ml-4 pl-4 border-l border-slate-200 dark:border-slate-800 py-1 mb-2">
                <span className="text-sky-500 font-bold mr-2 text-sm">{trimmed.substring(0, 3)}</span>
-               <span className="text-sm font-medium text-slate-300">{trimmed.substring(3).trim()}</span>
+               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{trimmed.substring(3).trim()}</span>
             </div>
           )
         }
         
-        return <p key={idx} className="text-sm leading-relaxed text-slate-400 font-medium">{trimmed}</p>;
+        return <p key={idx} className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">{trimmed}</p>;
       })}
     </div>
   );

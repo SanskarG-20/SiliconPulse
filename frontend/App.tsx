@@ -7,10 +7,10 @@ import { BackgroundLayer } from './components/BackgroundLayer';
 
 const HomePage: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col text-[#F1F5F9] relative">
+    <div className="min-h-screen flex flex-col text-slate-800 dark:text-[#F1F5F9] relative">
       <BackgroundLayer />
 
-      <header className="h-[56px] border-b border-[#1C3553]/50 flex items-center justify-between px-4 md:px-6 bg-[#050B1A]/70 backdrop-blur-xl">
+      <header className="h-[56px] border-b border-[#1C3553]/50 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-[#050B1A]/70 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <span className="w-8 h-8 rounded-[8px] bg-[#0E1E32] border border-[#1C3553] flex items-center justify-center">
             <span className="w-[18px] h-[18px] rounded-[5px] bg-[#22D3EE] flex items-center justify-center">
@@ -25,13 +25,13 @@ const HomePage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <SignedIn>
-            <Link to="/dashboard" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[11px] font-semibold tracking-[0.04em] text-[#94A3B8] hover:text-white hover:border-[#22D3EE]/30 transition-colors">
+            <Link to="/dashboard" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[11px] font-semibold tracking-[0.04em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white hover:border-[#22D3EE]/30 transition-colors">
               Dashboard <ArrowRight size={12} />
             </Link>
             <UserButton afterSignOutUrl="/" />
           </SignedIn>
           <SignedOut>
-            <Link to="/sign-in" className="px-3 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[11px] font-semibold tracking-[0.04em] text-[#94A3B8] hover:text-white transition-colors">
+            <Link to="/sign-in" className="px-3 py-1.5 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[11px] font-semibold tracking-[0.04em] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white transition-colors">
               Sign in
             </Link>
             <Link to="/sign-up" className="px-3.5 py-1.5 rounded-full bg-[#E8A253] text-[#050B1A] text-[11px] font-bold tracking-[0.04em] hover:bg-[#F0A85E] shadow-[0_0_14px_rgba(232,162,83,0.28)] transition-colors">
@@ -54,7 +54,7 @@ const HomePage: React.FC = () => {
               <br />
               stack.
             </h1>
-            <p className="serif text-[16px] md:text-[18px] leading-relaxed text-[#94A3B8] max-w-[560px]">
+            <p className="serif text-[16px] md:text-[18px] leading-relaxed text-slate-600 dark:text-[#94A3B8] max-w-[560px]">
               Live supply-chain signals, yield notes and market shifts — cross-referenced, scored and briefed with fab-aware Graph RAG. One query, one confident report.
             </p>
             <div className="flex flex-wrap gap-2.5 pt-1">
@@ -67,7 +67,7 @@ const HomePage: React.FC = () => {
                 <Link to="/sign-up" className="inline-flex items-center gap-1.5 px-5 py-3 rounded-full bg-[#E8A253] text-[#050B1A] text-[12px] font-bold tracking-[0.04em] hover:bg-[#F0A85E] shadow-[0_0_18px_rgba(232,162,83,0.3)] transition-colors">
                   Get started <ArrowRight size={14} />
                 </Link>
-                <Link to="/sign-in" className="px-5 py-3 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[#CBD5E1] text-[12px] font-semibold tracking-[0.04em] hover:border-[#22D3EE]/30 hover:text-white transition-colors">
+                <Link to="/sign-in" className="px-5 py-3 rounded-full bg-[#0E1E32] border border-[#1C3553] text-[#CBD5E1] text-[12px] font-semibold tracking-[0.04em] hover:border-[#22D3EE]/30 hover:text-slate-900 dark:hover:text-white transition-colors">
                   Sign in
                 </Link>
               </SignedOut>
@@ -81,7 +81,7 @@ const HomePage: React.FC = () => {
 
           <div className="relative rounded-[20px] border border-[#1C3553]/50 bg-[#0E1E32]/40 p-4 md:p-5 blueprint-grid overflow-hidden">
             <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ background: 'radial-gradient(circle at 70% 20%, #E8A253 1px, transparent 1.6px)', backgroundSize: '18px 18px' }} />
-            <div className="relative rounded-[14px] border border-[#1C3553]/40 bg-[#050B1A]/80 p-4 space-y-3">
+            <div className="relative rounded-[14px] border border-[#1C3553]/40 bg-white dark:bg-[#050B1A]/80 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="mono text-[10px] tracking-[0.1em] font-semibold text-[#22D3EE]">LIVE RETICLE • TSMC N2</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse" />
@@ -93,9 +93,9 @@ const HomePage: React.FC = () => {
                   { k: 'HBM', v: 'Short', sub: '−12% cap' },
                 ].map((s) => (
                   <div key={s.k} className="rounded-[12px] bg-[#0E1E32] border border-[#1C3553]/40 p-2.5">
-                    <p className="mono text-[9px] tracking-[0.1em] font-semibold text-[#64748B]">{s.k}</p>
+                    <p className="mono text-[9px] tracking-[0.1em] font-semibold text-slate-500 dark:text-[#64748B]">{s.k}</p>
                     <p className="display text-[16px] font-bold tracking-[-0.02em] text-white leading-none mt-1">{s.v}</p>
-                    <p className="mono text-[10px] text-[#64748B] mt-1">{s.sub}</p>
+                    <p className="mono text-[10px] text-slate-500 dark:text-[#64748B] mt-1">{s.sub}</p>
                   </div>
                 ))}
               </div>
@@ -105,7 +105,7 @@ const HomePage: React.FC = () => {
                 </span>
                 <div className="min-w-0">
                   <p className="text-[12px] font-semibold leading-tight text-[#E2E8F0] truncate">TSMC N2 yield hits 90% ahead of Apple ramp</p>
-                  <p className="mono text-[10px] tracking-[0.06em] text-[#64748B]">CoWoS • N3 → N2 • 2h ago</p>
+                  <p className="mono text-[10px] tracking-[0.06em] text-slate-500 dark:text-[#64748B]">CoWoS • N3 → N2 • 2h ago</p>
                 </div>
               </div>
               <div className="flex items-center justify-between mono text-[10px] tracking-[0.08em] text-[#475569] pt-1 border-t border-[#1C3553]/30">
@@ -120,9 +120,9 @@ const HomePage: React.FC = () => {
                 { title: 'Graph RAG', desc: 'ASML → TSMC → NVIDIA' },
                 { title: 'Verified', desc: 'Trust • provenance' },
               ].map((f) => (
-                <div key={f.title} className="rounded-[12px] bg-[#050B1A]/60 border border-[#1C3553]/30 p-2.5">
+                <div key={f.title} className="rounded-[12px] bg-white dark:bg-[#050B1A]/60 border border-[#1C3553]/30 p-2.5">
                   <p className="display text-[10px] font-semibold tracking-[0.08em] text-white">{f.title}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-[#64748B]">{f.desc}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-[#64748B]">{f.desc}</p>
                 </div>
               ))}
             </div>
@@ -133,7 +133,7 @@ const HomePage: React.FC = () => {
       <footer className="border-t border-[#1C3553]/30 py-4 px-6 flex flex-wrap items-center justify-between gap-3 mono text-[10px] tracking-[0.08em] text-[#475569]">
         <span>© 2026 SiliconPulse • Fab-aware intelligence</span>
         <span className="flex items-center gap-2">
-          <ShieldAlert size={12} className="text-[#64748B]" /> Analyst advisory • Not financial advice
+          <ShieldAlert size={12} className="text-slate-500 dark:text-[#64748B]" /> Analyst advisory • Not financial advice
         </span>
       </footer>
     </div>
@@ -148,7 +148,7 @@ const App: React.FC = () => {
         <Route
           path="/sign-in/*"
           element={
-            <div className="flex bg-[#050B1A] items-center justify-center min-h-screen w-screen p-4">
+            <div className="flex bg-white dark:bg-[#050B1A] items-center justify-center min-h-screen w-screen p-4">
               <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl="/dashboard" />
             </div>
           }
@@ -156,7 +156,7 @@ const App: React.FC = () => {
         <Route
           path="/sign-up/*"
           element={
-            <div className="flex bg-[#050B1A] items-center justify-center min-h-screen w-screen p-4">
+            <div className="flex bg-white dark:bg-[#050B1A] items-center justify-center min-h-screen w-screen p-4">
               <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl="/dashboard" />
             </div>
           }

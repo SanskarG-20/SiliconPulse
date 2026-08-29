@@ -13,7 +13,7 @@ interface InputBarProps {
 
 export const InputBar: React.FC<InputBarProps> = ({ query, onQueryChange, onSubmit, loading, lastUpdate, activeCount }) => {
   return (
-    <div className="p-3 md:p-4 bg-[#050B1A]/80 backdrop-blur-xl border-t border-[#1C3553]/50">
+    <div className="p-3 md:p-4 bg-white dark:bg-[#050B1A]/80 backdrop-blur-xl border-t border-[#1C3553]/50">
       <div className="max-w-[760px] mx-auto space-y-2.5">
         <form onSubmit={onSubmit} className="relative group">
           <div className="absolute -inset-[1px] rounded-[16px] bg-gradient-to-r from-[#22D3EE]/0 via-[#22D3EE]/20 to-[#E8A253]/20 opacity-0 group-focus-within:opacity-100 blur-[8px] transition-opacity duration-300 pointer-events-none" />
@@ -24,11 +24,11 @@ export const InputBar: React.FC<InputBarProps> = ({ query, onQueryChange, onSubm
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Ask about yield, supply, or a company…"
-              className="flex-1 min-w-0 py-2.5 bg-transparent outline-none text-[13.5px] text-[#F1F5F9] placeholder:text-[#475569] placeholder:mono placeholder:text-[12px] placeholder:tracking-[0.02em]"
+              className="flex-1 min-w-0 py-2.5 bg-transparent outline-none text-[13.5px] text-slate-800 dark:text-[#F1F5F9] placeholder:text-[#475569] placeholder:mono placeholder:text-[12px] placeholder:tracking-[0.02em]"
               disabled={loading}
               aria-label="Query"
             />
-            <span className="hidden md:inline-flex items-center mono text-[10px] tracking-[0.08em] text-[#475569] border border-[#1C3553] rounded-full px-2 py-1 bg-[#050B1A]">ENTER</span>
+            <span className="hidden md:inline-flex items-center mono text-[10px] tracking-[0.08em] text-[#475569] border border-[#1C3553] rounded-full px-2 py-1 bg-white dark:bg-[#050B1A]">ENTER</span>
             <button
               type="submit"
               disabled={loading || !query.trim()}
@@ -42,10 +42,10 @@ export const InputBar: React.FC<InputBarProps> = ({ query, onQueryChange, onSubm
 
         <div className="flex items-center justify-between px-1 mono text-[10px] tracking-[0.08em]">
           <span className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+            <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-[#64748B]">
               <Clock size={11} /> FRESH <span className="text-[#22D3EE]">{lastUpdate}</span>
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[#64748B]">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-slate-500 dark:text-[#64748B]">
               <TrendingUp size={11} className="text-emerald-400" /> ACTIVE <span className="text-emerald-400">{activeCount}</span>
             </span>
           </span>

@@ -2,7 +2,7 @@ import React from 'react';
 
 export const BackgroundLayer: React.FC = () => {
   return (
-    <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-[#050B1A]">
+    <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-white dark:bg-[#050B1A]">
       {/* Deep void with subtle vignette */}
       <div
         className="absolute inset-0"

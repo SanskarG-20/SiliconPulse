@@ -164,16 +164,7 @@ export const useDashboard = (): UseDashboardReturn => {
     });
   }, []);
 
-  useEffect(() => {
-    if (isLightMode) {
-      document.documentElement.classList.add('light-theme');
-      localStorage.setItem('siliconpulse_theme', 'light');
-    } else {
-      document.documentElement.classList.remove('light-theme');
-      localStorage.setItem('siliconpulse_theme', 'dark');
-    }
-  }, [isLightMode]);
-
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const feedRotationRef = useRef(0);
   const recommendationKeysRef = useRef<Set<string>>(new Set());

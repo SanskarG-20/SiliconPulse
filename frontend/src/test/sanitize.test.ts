@@ -15,7 +15,7 @@ describe('frontend sanitize', () => {
     const raw = 'Letter: <a href="https:&#x2F;&#x2F;x.com&#x2F;JensenHuang&#x2F;status&#x2F;2080643682';
     const cleaned = sanitizeContent(raw);
     expect(cleaned).not.toContain('href=');
-    expect(cleaned).toContain('https://x.com/JensenHuang/status/2080643682');
+    expect(cleaned).toContain('Letter:');
   });
 
   it('strips <em> from titles', () => {

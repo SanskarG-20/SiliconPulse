@@ -10,6 +10,7 @@ from .query import router as query_router
 from .recommendations import router as recommendations_router
 from .signals import router as signals_router
 from .sources import router as sources_router
+from .videos import router as videos_router
 
 router = APIRouter(dependencies=[])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -22,3 +23,4 @@ router.include_router(diagnostics_router, prefix="/user", tags=["diagnostics"])
 router.include_router(llm_router, prefix="/llm", tags=["llm"])
 router.include_router(graph_router, prefix="/graph", tags=["graph"])
 router.include_router(ingest_router, prefix="/ingest", tags=["ingest"])
+router.include_router(videos_router, prefix="", tags=["videos"])

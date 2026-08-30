@@ -149,6 +149,17 @@ export const useDashboard = (): UseDashboardReturn => {
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem('siliconpulse_theme') === 'light';
   });
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('siliconpulse_theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('siliconpulse_theme', 'dark');
+    }
+  }, [isLightMode]);
+
   const [backendOnline, setBackendOnline] = useState<boolean>(true);
   const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
 

@@ -9,6 +9,7 @@ import logging
 from .company_dict import COMPANY_DICT
 from .models import EvidenceItem
 from .services.embedding_service import embed_text
+from .services.indexed_retrieval import reciprocal_rank_fusion, rerank_results, search_local_signals
 from .services.vector_store import is_available as vector_available
 from .services.vector_store import query_similar
 from .settings import settings
@@ -74,44 +75,28 @@ async def retrieve_evidence(query_text: str, k: int = 5) -> list[EvidenceItem]:
 
     if not db_search_successful:
         data_path = settings.resolved_data_path
-        events = safe_read_jsonl(data_path, limit=settings.max_events_to_scan, freshness_hours=settings.freshness_hours)
-        if not events:
-            events = safe_read_jsonl(data_path, limit=settings.max_events_to_scan, freshness_hours=None)
-
-        vector_hits: dict[str, float] = {}
-        if vector_available() and bool(events):
+        query_terms = " ".join(_expand_keywords(query_text))
+        keyword_hits = search_local_signals(query_terms, data_path, limit=settings.max_events_to_scan)
+        vector_hits = []
+        if vector_available():
             try:
                 q_emb = await embed_text(query_text)
                 if q_emb:
-                    for hit in query_similar(q_emb, k=min(30, len(events) * 2)):
-                        t = hit.get("title", "")
-                        if t:
-                            vector_hits[t] = float(hit.get("similarity", 0.0))
+                    vector_hits = query_similar(q_emb, k=min(100, settings.max_events_to_scan))
             except Exception as ve:
                 logger.debug(f"retrieve_evidence vector search failed: {ve}")
+        if keyword_hits is None:
+            # Compatibility path for SQLite builds without FTS5.
+            events = safe_read_jsonl(data_path, limit=settings.max_events_to_scan, freshness_hours=settings.freshness_hours)
+            if not events:
+                events = safe_read_jsonl(data_path, limit=settings.max_events_to_scan, freshness_hours=None)
+            query_keywords = _expand_keywords(query_text)
+            keyword_hits = [event for event in events if any(
+                keyword in " ".join(str(event.get(key) or "").lower() for key in ("title", "content", "company"))
+                for keyword in query_keywords
+            )]
+        matched_events = reciprocal_rank_fusion(keyword_hits, vector_hits, limit=k * 10)
 
-        query_keywords = _expand_keywords(query_text)
-        for event in events:
-            title = event.get("title", "").lower()
-            content = event.get("content", "").lower()
-            company = event.get("company", "").lower() if event.get("company") else ""
-            if any(kw in title or kw in content or kw in company for kw in query_keywords):
-                matched_events.append(event)
-
-        if vector_hits:
-            seen = {e.get("title") for e in matched_events}
-            for event in events:
-                t = event.get("title", "")
-                if t in vector_hits and t not in seen and vector_hits[t] >= 0.55:
-                    matched_events.append(event)
-
-        seen_keys = set()
-        unique_matched = []
-        for event in matched_events:
-            key = (event.get("title"), event.get("source"))
-            if key not in seen_keys:
-                seen_keys.add(key)
-                unique_matched.append(event)
-        matched_events = unique_matched
+    matched_events = rerank_results(query_text, matched_events, limit=k)
 
     return _to_evidence(matched_events)[:k]

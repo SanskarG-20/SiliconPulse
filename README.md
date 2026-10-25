@@ -24,6 +24,7 @@ The system degrades gracefully: without API keys it falls back to keyword search
 - **Supply-chain Graph RAG** — Company dependency graph (e.g. ASML → TSMC → NVIDIA) with impact/supplier analysis and what-if shock simulation.
 - **Evidence-backed briefings** — Every claim links to timestamped sources with trust levels and confidence scoring.
 - **Computed confidence** — `confidence.formula` and `confidence.factors` expose the score from independent sources, source trust, recency, and corroboration; corroboration uses near-duplicate clusters only when multiple independent sources report the item. Evidence includes `cluster_id` and `cluster_size`; the report cannot set its own score.
+- **Hybrid retrieval** — Hosted search uses Postgres full-text and pgvector rankings fused with reciprocal rank fusion, followed by a deterministic lexical reranker. Run `backend/sql/pgvector_hybrid_search.sql` after the base pgvector schema; local development uses a rebuildable SQLite FTS cache with JSONL as a bootstrap/fallback source.
 - **Head-to-head comparison** — Side-by-side analysis of up to 4 companies with shared-exposure detection.
 - **Trend detection** — Daily signal timelines with statistical spike alerts.
 - **Team collaboration** — Workspaces with shared watchlists, shareable brief links (`/b/:id`), discussion threads, and Slack/Discord alerts.

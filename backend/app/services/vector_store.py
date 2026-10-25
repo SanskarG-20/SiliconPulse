@@ -134,6 +134,7 @@ def upsert_signals(events: list[dict], embeddings: list[list[float]]) -> int:
             docs.append(f"{ev.get('title','')} {ev.get('content') or ev.get('snippet','')}"[:2000])
             metas.append(
                 {
+                    "event_id": eid,
                     "title": ev.get("title", "")[:500],
                     "source": ev.get("source", "Unknown")[:100],
                     "timestamp": ev.get("timestamp", ""),

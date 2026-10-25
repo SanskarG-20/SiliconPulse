@@ -552,6 +552,10 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
         events_to_write = insert_events(new_events)
     added_count = len(events_to_write)
 
+    if events_to_write:
+        from .services.indexed_retrieval import index_local_events
+        index_local_events(events_to_write)
+
     cache_enabled = not canonical_store or (
         settings.local_cache_enabled and settings.app_env.lower() != "production"
     )

@@ -18,7 +18,7 @@ def _clear_query_cache():
 
 def test_query_returns_evidence_and_signal():
     _clear_query_cache()
-    with patch("app.routes.query.safe_read_jsonl") as mock_read:
+    with patch("app.routes.query.safe_read_jsonl") as mock_read, patch("app.routes.query.search_local_signals", return_value=None):
         mock_read.return_value = [
             {
                 "title": "NVIDIA launches H100 successor",

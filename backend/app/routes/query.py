@@ -21,6 +21,7 @@ from ..models import (
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
+from ..services.indexed_retrieval import reciprocal_rank_fusion, rerank_results, search_local_signals
 from ..services.near_duplicates import annotate_clusters
 from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
@@ -90,6 +91,8 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
 
         matched_events = []
         db_search_successful = False
+        indexed_search_successful = False
+        q_emb = None
 
         # Attempt Database-level Hybrid Search (RRF)
         if vector_available():
@@ -129,6 +132,35 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
 
         # Fallback to local file-based search
         if not db_search_successful:
+            raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
+            query_keywords = set(raw_keywords)
+            for company, data in COMPANY_DICT.items():
+                aliases = [a.lower() for a in data.get("aliases", [])]
+                aliases.append(company.lower())
+                if any(kw in aliases for kw in raw_keywords):
+                    query_keywords.update(aliases)
+
+            keyword_hits = search_local_signals(
+                " ".join(query_keywords), data_path, limit=settings.max_events_to_scan
+            )
+            if keyword_hits is not None:
+                indexed_search_successful = True
+                vector_hits = []
+                if vector_available():
+                    try:
+                        if q_emb is None:
+                            q_emb = await embed_text(body.query)
+                        if q_emb:
+                            vector_hits = query_similar(q_emb, k=min(100, settings.max_events_to_scan))
+                    except Exception as ve:
+                        logger.warning(f"[{request_id}] Vector search failed: {ve}")
+                matched_events = reciprocal_rank_fusion(keyword_hits, vector_hits, limit=body.k * 10)
+                logger.info(
+                    f"[{request_id}] Indexed local search: keyword={len(keyword_hits)} vector={len(vector_hits)}"
+                )
+
+        # Compatibility fallback for local runtimes without SQLite FTS5.
+        if not db_search_successful and not indexed_search_successful:
             events = safe_read_jsonl(
                 data_path,
                 limit=settings.max_events_to_scan,
@@ -197,6 +229,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                     unique_matched.append(event)
             matched_events = unique_matched
 
+        matched_events = rerank_results(body.query, matched_events, limit=max(body.k * 10, body.k))
         evidence_list = []
         for event in matched_events:
             snippet = event.get("snippet", "")
@@ -218,7 +251,6 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                 event_type=event.get("event_type", "general")
             ))
 
-        evidence_list.sort(key=lambda x: x.timestamp, reverse=True)
         evidence_list = evidence_list[:body.k]
         annotate_clusters(evidence_list)
 

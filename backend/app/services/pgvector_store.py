@@ -115,6 +115,7 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
             meta = row.get("metadata", {}) if isinstance(row, dict) else {}
             # Ensure expected keys
             item = dict(meta)
+            item["event_id"] = row.get("id")
             item["similarity"] = round(float(row.get("similarity", 0.0)), 4)
             item["distance"] = round(1.0 - float(row.get("similarity", 0.0)), 4)
             item["content"] = row.get("document", "")
@@ -152,6 +153,7 @@ def query_hybrid(query_text: str, query_embedding: list[float], k: int = 20) -> 
         for row in data:
             meta = row.get("metadata", {}) if isinstance(row, dict) else {}
             item = dict(meta)
+            item["event_id"] = row.get("id")
             item["similarity"] = round(float(row.get("similarity", 0.0)), 4)
             item["distance"] = round(1.0 - float(row.get("similarity", 0.0)), 4)
             item["content"] = row.get("document", "")

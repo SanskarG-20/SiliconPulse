@@ -23,7 +23,7 @@ The system degrades gracefully: without API keys it falls back to keyword search
 - **Hybrid search** — Keyword alias expansion merged with `gemini-embedding-001` vector search (Supabase pgvector in hosted environments; Chroma only for local development).
 - **Supply-chain Graph RAG** — Company dependency graph (e.g. ASML → TSMC → NVIDIA) with impact/supplier analysis and what-if shock simulation.
 - **Evidence-backed briefings** — Every claim links to timestamped sources with trust levels and confidence scoring.
-- **Computed confidence** — `confidence.formula` and `confidence.factors` expose the score from independent sources, source trust, recency, and corroboration; the report cannot set its own score.
+- **Computed confidence** — `confidence.formula` and `confidence.factors` expose the score from independent sources, source trust, recency, and corroboration; corroboration uses near-duplicate clusters only when multiple independent sources report the item. Evidence includes `cluster_id` and `cluster_size`; the report cannot set its own score.
 - **Head-to-head comparison** — Side-by-side analysis of up to 4 companies with shared-exposure detection.
 - **Trend detection** — Daily signal timelines with statistical spike alerts.
 - **Team collaboration** — Workspaces with shared watchlists, shareable brief links (`/b/:id`), discussion threads, and Slack/Discord alerts.

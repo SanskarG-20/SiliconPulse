@@ -19,6 +19,8 @@ class EvidenceItem(BaseModel):
     event_type: Optional[str] = Field(None, description="Type of event")
     url: Optional[str] = Field(None, description="URL of the event")
     event_id: Optional[str] = Field(None, description="Unique event ID")
+    cluster_id: Optional[str] = Field(None, description="Near-duplicate evidence cluster")
+    cluster_size: Optional[int] = Field(None, ge=1, description="Signals in the near-duplicate cluster")
 
 class ConfidenceInfo(BaseModel):
     """Confidence information for the query results"""

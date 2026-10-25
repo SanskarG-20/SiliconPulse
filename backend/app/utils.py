@@ -513,6 +513,11 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
     if not new_events:
         return 0
 
+    # Keep near-duplicate items as separate evidence, but persist their cluster
+    # metadata so later reports can distinguish repetition from independence.
+    from .services.near_duplicates import annotate_clusters
+    annotate_clusters(new_events)
+
     added_count = 0
     events_to_write = []
     from .settings import settings
@@ -716,8 +721,8 @@ def compute_confidence(evidence: list) -> dict:
     """Score independent sources, their trust tier, recency and corroboration.
 
     Every factor is normalized to [0, 1]. Recency falls linearly to zero at 72h.
-    Corroboration is the share of distinct normalized titles supported by multiple
-    independent URL hosts (or source names when a URL is unavailable).
+    Corroboration measures the share of evidence in near-duplicate clusters
+    supported by at least two independent URL hosts (or source names).
     """
     formula = "round(100 * (0.30 * independent_source_factor + 0.25 * source_trust + 0.20 * recency + 0.25 * corroboration))"
     weights = {"independent_source_factor": 0.30, "source_trust": 0.25, "recency": 0.20, "corroboration": 0.25}
@@ -727,7 +732,8 @@ def compute_confidence(evidence: list) -> dict:
 
     source_ids: set[str] = set()
     source_trust: dict[str, float] = {}
-    title_sources: dict[str, set[str]] = {}
+    from .services.near_duplicates import cluster_indices
+    source_ids_by_index: list[str] = []
     recency_values = []
     now = datetime.now(timezone.utc)
     for item in evidence:
@@ -740,9 +746,7 @@ def compute_confidence(evidence: list) -> dict:
         tier = get_trust_info(trust_name or host).get("trust_level", "Low")
         source_trust[source_id] = max(source_trust.get(source_id, 0.0), {"High": 1.0, "Medium": 0.65, "Low": 0.3}.get(tier, 0.3))
 
-        title = normalize_text(str(value(item, "title") or ""))
-        if title:
-            title_sources.setdefault(title, set()).add(source_id)
+        source_ids_by_index.append(source_id)
 
         timestamp = str(value(item, "timestamp") or "")
         try:
@@ -758,8 +762,15 @@ def compute_confidence(evidence: list) -> dict:
     independent_factor = min(independent_count / 3.0, 1.0)
     trust_factor = sum(source_trust.values()) / len(source_trust) if source_trust else 0.0
     recency_factor = sum(recency_values) / len(recency_values) if recency_values else 0.0
-    corroborated_titles = sum(1 for sources in title_sources.values() if len(sources) >= 2)
-    corroboration_factor = corroborated_titles / len(title_sources) if title_sources else 0.0
+    clusters = cluster_indices(evidence)
+    corroborated_indices = set()
+    corroborated_cluster_count = 0
+    for cluster in clusters:
+        if len({source_ids_by_index[index] for index in cluster}) >= 2:
+            corroborated_cluster_count += 1
+            corroborated_indices.update(cluster)
+    corroboration_factor = len(corroborated_indices) / len(evidence) if evidence else 0.0
+    largest_cluster_size = max((len(cluster) for cluster in clusters), default=0)
     score = round(100 * (
         weights["independent_source_factor"] * independent_factor
         + weights["source_trust"] * trust_factor
@@ -782,6 +793,10 @@ def compute_confidence(evidence: list) -> dict:
             "source_trust": round(trust_factor, 4),
             "recency": round(recency_factor, 4),
             "corroboration": round(corroboration_factor, 4),
+            "near_duplicate_cluster_count": len(clusters),
+            "corroborated_cluster_count": corroborated_cluster_count,
+            "largest_cluster_size": largest_cluster_size,
+            "near_duplicate_event_count": sum(len(cluster) for cluster in clusters if len(cluster) > 1),
             "weights": weights,
         },
     }

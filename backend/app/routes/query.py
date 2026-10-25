@@ -21,6 +21,7 @@ from ..models import (
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
+from ..services.near_duplicates import annotate_clusters
 from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
 from ..services.vector_store import query_similar
@@ -219,6 +220,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
 
         evidence_list.sort(key=lambda x: x.timestamp, reverse=True)
         evidence_list = evidence_list[:body.k]
+        annotate_clusters(evidence_list)
 
         confidence = compute_confidence(evidence_list)
         result = {

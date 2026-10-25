@@ -1,0 +1,652 @@
+[
+  {
+    "id": "Q01",
+    "query": "Intel Silex Microsystems shares soar on Stockholm debut as MEMS foundry IPO clears at SEK 8.9bn EV",
+    "expected_entities": [
+      "Intel"
+    ],
+    "expected_source_domains": [
+      "thenextweb.com"
+    ],
+    "key_facts": [
+      "Silex Microsystems shares soar on Stockholm debut as MEMS foundry IPO clears at SEK 8.9bn EV"
+    ]
+  },
+  {
+    "id": "Q02",
+    "query": "Google Scale AI wins $500m Pentagon contract, five times its previous Defense Department deal",
+    "expected_entities": [
+      "Google"
+    ],
+    "expected_source_domains": [
+      "thenextweb.com"
+    ],
+    "key_facts": [
+      "Scale AI wins $500m Pentagon contract, five times its previous Defense Department deal"
+    ]
+  },
+  {
+    "id": "Q03",
+    "query": "Intel ​Strong guidance, AI demand power Arm Holdings stock rally",
+    "expected_entities": [
+      "Intel"
+    ],
+    "expected_source_domains": [
+      "m.economictimes.com"
+    ],
+    "key_facts": [
+      "​Strong guidance, AI demand power Arm Holdings stock rally"
+    ]
+  },
+  {
+    "id": "Q04",
+    "query": "Apple Samsung hits $1 trillion valuation as AI boom drives massive chip demand",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.intomobile.com"
+    ],
+    "key_facts": [
+      "Samsung hits $1 trillion valuation as AI boom drives massive chip demand"
+    ]
+  },
+  {
+    "id": "Q05",
+    "query": "Apple Intel stock hits an all-time high after Apple chip deal report",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "betanews.com"
+    ],
+    "key_facts": [
+      "Intel stock hits an all-time high after Apple chip deal report"
+    ]
+  },
+  {
+    "id": "Q06",
+    "query": "TSMC EWT, EWY, and SOXX: The Only 3 ETFs You Need for Semiconductor Dominance",
+    "expected_entities": [
+      "TSMC"
+    ],
+    "expected_source_domains": [
+      "247wallst.com"
+    ],
+    "key_facts": [
+      "EWT, EWY, and SOXX: The Only 3 ETFs You Need for Semiconductor Dominance"
+    ]
+  },
+  {
+    "id": "Q07",
+    "query": "Microsoft Microsoft Reconsiders Energy Goal Amid AI Boom",
+    "expected_entities": [
+      "Microsoft"
+    ],
+    "expected_source_domains": [
+      "ca.finance.yahoo.com"
+    ],
+    "key_facts": [
+      "Microsoft Reconsiders Energy Goal Amid AI Boom"
+    ]
+  },
+  {
+    "id": "Q08",
+    "query": "Apple Earnings call transcript: MACOM Technology’s Q2 2026 earnings beat expectations",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "ng.investing.com"
+    ],
+    "key_facts": [
+      "Earnings call transcript: MACOM Technology’s Q2 2026 earnings beat expectations"
+    ]
+  },
+  {
+    "id": "Q09",
+    "query": "NVIDIA Spatial Computing Market Size Accelerating at 24.8% CAGR | By Key Players: Apple, Microsoft, Meta, Google, NVIDIA, Qualcomm",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.openpr.com"
+    ],
+    "key_facts": [
+      "Spatial Computing Market Size Accelerating at 24.8% CAGR | By Key Players: Apple, Microsoft, Meta, Google, NVIDIA, Qualcomm"
+    ]
+  },
+  {
+    "id": "Q10",
+    "query": "Intel Asia Intelligence Brief for Thursday, May 7, 2026",
+    "expected_entities": [
+      "Intel"
+    ],
+    "expected_source_domains": [
+      "www.riotimesonline.com"
+    ],
+    "key_facts": [
+      "Asia Intelligence Brief for Thursday, May 7, 2026"
+    ]
+  },
+  {
+    "id": "Q11",
+    "query": "Google DeepL Layoffs: Google Translate Rival to Cut 25% of Staff Amid AI Structural Shift; Check Details",
+    "expected_entities": [
+      "Google"
+    ],
+    "expected_source_domains": [
+      "www.latestly.com"
+    ],
+    "key_facts": [
+      "DeepL Layoffs: Google Translate Rival to Cut 25% of Staff Amid AI Structural Shift; Check Details"
+    ]
+  },
+  {
+    "id": "Q12",
+    "query": "Apple The best time to buy a Mac is right now",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.cultofmac.com"
+    ],
+    "key_facts": [
+      "The best time to buy a Mac is right now"
+    ]
+  },
+  {
+    "id": "Q13",
+    "query": "NVIDIA \"Semi-Irrational Chase\" Sends Futures To Another Record High, Oil Drops On Iran Optimism",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.zerohedge.com"
+    ],
+    "key_facts": [
+      "\"Semi-Irrational Chase\" Sends Futures To Another Record High, Oil Drops On Iran Optimism"
+    ]
+  },
+  {
+    "id": "Q14",
+    "query": "Apple iPhone 18 Pro Leak Reveals Smaller Dynamic Island, Bigger Battery and A20 Pro Chip Upgrade",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.stackumbrella.com"
+    ],
+    "key_facts": [
+      "iPhone 18 Pro Leak Reveals Smaller Dynamic Island, Bigger Battery and A20 Pro Chip Upgrade"
+    ]
+  },
+  {
+    "id": "Q15",
+    "query": "NVIDIA Al Chip Market Research and Global Forecast Report 2025-2030: Lucrative Opportunities in AI-Driven Diagnostics Expansion, Cloud Infrastructure Expansion and Rising Adoption of ASIC Technologies",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.globenewswire.com"
+    ],
+    "key_facts": [
+      "Al Chip Market Research and Global Forecast Report 2025-2030: Lucrative Opportunities in AI-Driven Diagnostics Expansion, Cloud Infrastructure Expansion and Rising Adoption of ASIC Technologies"
+    ]
+  },
+  {
+    "id": "Q16",
+    "query": "NVIDIA The American tech manufacturing success story hiding in plain sight",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.fastcompany.com"
+    ],
+    "key_facts": [
+      "The American tech manufacturing success story hiding in plain sight"
+    ]
+  },
+  {
+    "id": "Q17",
+    "query": "NVIDIA AI data center boom squeezes consumer tech’s chip supply—even though they use different chips",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.fastcompany.com"
+    ],
+    "key_facts": [
+      "AI data center boom squeezes consumer tech’s chip supply—even though they use different chips"
+    ]
+  },
+  {
+    "id": "Q18",
+    "query": "Google How David Sacks crashed and burned in the White House",
+    "expected_entities": [
+      "Google"
+    ],
+    "expected_source_domains": [
+      "www.theverge.com"
+    ],
+    "key_facts": [
+      "How David Sacks crashed and burned in the White House"
+    ]
+  },
+  {
+    "id": "Q19",
+    "query": "Intel Indonesia eyes role in global AI industry supply chain",
+    "expected_entities": [
+      "Intel"
+    ],
+    "expected_source_domains": [
+      "en.antaranews.com"
+    ],
+    "key_facts": [
+      "Indonesia eyes role in global AI industry supply chain"
+    ]
+  },
+  {
+    "id": "Q20",
+    "query": "Meta Sell These 4 Stocks and Go All In on These 3 Stocks Before May 9th for 100x Returns?",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "www.insidermonkey.com"
+    ],
+    "key_facts": [
+      "Sell These 4 Stocks and Go All In on These 3 Stocks Before May 9th for 100x Returns?"
+    ]
+  },
+  {
+    "id": "Q21",
+    "query": "AMD Benchmark raises AMD stock price target to $485 on AI growth outlook",
+    "expected_entities": [
+      "AMD"
+    ],
+    "expected_source_domains": [
+      "ca.investing.com"
+    ],
+    "key_facts": [
+      "Benchmark raises AMD stock price target to $485 on AI growth outlook"
+    ]
+  },
+  {
+    "id": "Q22",
+    "query": "Intel Intel is bringing a chip to every computing category at Computex. The last time it could do that, it was the company everyone was trying to catch.",
+    "expected_entities": [
+      "Intel"
+    ],
+    "expected_source_domains": [
+      "thenextweb.com"
+    ],
+    "key_facts": [
+      "Intel is bringing a chip to every computing category at Computex. The last time it could do that, it was the company everyone was trying to catch."
+    ]
+  },
+  {
+    "id": "Q23",
+    "query": "Google Google Chrome silently installs a 4 GB AI model on your device without consent",
+    "expected_entities": [
+      "Google"
+    ],
+    "expected_source_domains": [
+      "www.thatprivacyguy.com"
+    ],
+    "key_facts": [
+      "Google Chrome silently installs a 4 GB AI model on your device without consent"
+    ]
+  },
+  {
+    "id": "Q24",
+    "query": "Meta Meta tells staff it will cut 10% of jobs",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "www.bloomberg.com"
+    ],
+    "key_facts": [
+      "Meta tells staff it will cut 10% of jobs"
+    ]
+  },
+  {
+    "id": "Q25",
+    "query": "Meta Meta to start capturing employee mouse movements, keystrokes for AI training",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "www.reuters.com"
+    ],
+    "key_facts": [
+      "Meta to start capturing employee mouse movements, keystrokes for AI training"
+    ]
+  },
+  {
+    "id": "Q26",
+    "query": "Amazon Project Glasswing: Securing critical software for the AI era",
+    "expected_entities": [
+      "Amazon"
+    ],
+    "expected_source_domains": [
+      "www.anthropic.com"
+    ],
+    "key_facts": [
+      "Project Glasswing: Securing critical software for the AI era"
+    ]
+  },
+  {
+    "id": "Q27",
+    "query": "Meta Reddit User Uncovers Who Is Behind Meta's $2B Lobbying for Age Verification Tech",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "www.gadgetreview.com"
+    ],
+    "key_facts": [
+      "Reddit User Uncovers Who Is Behind Meta's $2B Lobbying for Age Verification Tech"
+    ]
+  },
+  {
+    "id": "Q28",
+    "query": "Meta Meta Platforms: Lobbying, dark money, and the App Store Accountability Act",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "github.com"
+    ],
+    "key_facts": [
+      "Meta Platforms: Lobbying, dark money, and the App Store Accountability Act"
+    ]
+  },
+  {
+    "id": "Q29",
+    "query": "TSMC TSMC N3E yields hitting 85%??",
+    "expected_entities": [
+      "TSMC"
+    ],
+    "expected_source_domains": [
+      "x.com"
+    ],
+    "key_facts": [
+      "TSMC N3E yields hitting 85%??"
+    ]
+  },
+  {
+    "id": "Q30",
+    "query": "TSMC TSMC 2nm Production Schedule Accelerated",
+    "expected_entities": [
+      "TSMC"
+    ],
+    "expected_source_domains": [
+      "perplexity.ai"
+    ],
+    "key_facts": [
+      "TSMC 2nm Production Schedule Accelerated"
+    ]
+  },
+  {
+    "id": "Q31",
+    "query": "Amazon AWS raises GPU prices 15% on a Saturday, hopes you weren't paying attention",
+    "expected_entities": [
+      "Amazon"
+    ],
+    "expected_source_domains": [
+      "www.theregister.com"
+    ],
+    "key_facts": [
+      "AWS raises GPU prices 15% on a Saturday, hopes you weren't paying attention"
+    ]
+  },
+  {
+    "id": "Q32",
+    "query": "Google Gemini 3 Flash: Frontier intelligence built for speed",
+    "expected_entities": [
+      "Google"
+    ],
+    "expected_source_domains": [
+      "blog.google"
+    ],
+    "key_facts": [
+      "Gemini 3 Flash: Frontier intelligence built for speed"
+    ]
+  },
+  {
+    "id": "Q33",
+    "query": "Amazon How I bypassed Amazon's Kindle web DRM",
+    "expected_entities": [
+      "Amazon"
+    ],
+    "expected_source_domains": [
+      "blog.pixelmelt.dev"
+    ],
+    "key_facts": [
+      "How I bypassed Amazon's Kindle web DRM"
+    ]
+  },
+  {
+    "id": "Q34",
+    "query": "Amazon AWS CEO says using AI to replace junior staff is 'Dumbest thing I've ever heard'",
+    "expected_entities": [
+      "Amazon"
+    ],
+    "expected_source_domains": [
+      "www.theregister.com"
+    ],
+    "key_facts": [
+      "AWS CEO says using AI to replace junior staff is 'Dumbest thing I've ever heard'"
+    ]
+  },
+  {
+    "id": "Q35",
+    "query": "AMD I helped fix sleep-wake hangs on Linux with AMD GPUs",
+    "expected_entities": [
+      "AMD"
+    ],
+    "expected_source_domains": [
+      "nyanpasu64.gitlab.io"
+    ],
+    "key_facts": [
+      "I helped fix sleep-wake hangs on Linux with AMD GPUs"
+    ]
+  },
+  {
+    "id": "Q36",
+    "query": "Amazon Amazon tells employees to return to office five days a week",
+    "expected_entities": [
+      "Amazon"
+    ],
+    "expected_source_domains": [
+      "www.cnbc.com"
+    ],
+    "key_facts": [
+      "Amazon tells employees to return to office five days a week"
+    ]
+  },
+  {
+    "id": "Q37",
+    "query": "Apple Asia’s chip giants power the AI rally as hardware demand surges",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.domain-b.com"
+    ],
+    "key_facts": [
+      "Asia’s chip giants power the AI rally as hardware demand surges"
+    ]
+  },
+  {
+    "id": "Q38",
+    "query": "Apple Bingham Private Wealth LLC Takes Position in Apple Inc. $AAPL",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.americanbankingnews.com"
+    ],
+    "key_facts": [
+      "Bingham Private Wealth LLC Takes Position in Apple Inc. $AAPL"
+    ]
+  },
+  {
+    "id": "Q39",
+    "query": "Apple Oak Ridge Investments LLC Buys 39,441 Shares of Apple Inc. $AAPL",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.americanbankingnews.com"
+    ],
+    "key_facts": [
+      "Oak Ridge Investments LLC Buys 39,441 Shares of Apple Inc. $AAPL"
+    ]
+  },
+  {
+    "id": "Q40",
+    "query": "Apple Intel targets entry-level advanced packaging, draws interest from Google and Amazon",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.digitimes.com"
+    ],
+    "key_facts": [
+      "Intel targets entry-level advanced packaging, draws interest from Google and Amazon"
+    ]
+  },
+  {
+    "id": "Q41",
+    "query": "Apple An Ode to Restraint: Lessons from the Tim Cook Legacy",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.blogger.com"
+    ],
+    "key_facts": [
+      "An Ode to Restraint: Lessons from the Tim Cook Legacy"
+    ]
+  },
+  {
+    "id": "Q42",
+    "query": "Apple Samsung Hits $1 Trillion Valuation Amid Apple Chip Diversification Talks",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.macrumors.com"
+    ],
+    "key_facts": [
+      "Samsung Hits $1 Trillion Valuation Amid Apple Chip Diversification Talks"
+    ]
+  },
+  {
+    "id": "Q43",
+    "query": "NVIDIA ASML CEO Says Jensen Huang 'Totally Right' On Exporting Products With An Eight-Generation Gap— Denies Top Chip Access To China",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.benzinga.com"
+    ],
+    "key_facts": [
+      "ASML CEO Says Jensen Huang 'Totally Right' On Exporting Products With An Eight-Generation Gap— Denies Top Chip Access To China"
+    ]
+  },
+  {
+    "id": "Q44",
+    "query": "Apple John Ternus to become Apple CEO",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.apple.com"
+    ],
+    "key_facts": [
+      "John Ternus to become Apple CEO"
+    ]
+  },
+  {
+    "id": "Q45",
+    "query": "Apple Author of \"Careless People\" banned from saying anything negative about Meta",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "www.thetimes.com"
+    ],
+    "key_facts": [
+      "Author of \"Careless People\" banned from saying anything negative about Meta"
+    ]
+  },
+  {
+    "id": "Q46",
+    "query": "Meta Meta’s AI smart glasses and data privacy concerns",
+    "expected_entities": [
+      "Meta"
+    ],
+    "expected_source_domains": [
+      "www.svd.se"
+    ],
+    "key_facts": [
+      "Meta’s AI smart glasses and data privacy concerns"
+    ]
+  },
+  {
+    "id": "Q47",
+    "query": "Apple TSMC to make advanced AI semiconductors in Japan",
+    "expected_entities": [
+      "Apple"
+    ],
+    "expected_source_domains": [
+      "apnews.com"
+    ],
+    "key_facts": [
+      "TSMC to make advanced AI semiconductors in Japan"
+    ]
+  },
+  {
+    "id": "Q48",
+    "query": "NVIDIA Apple is fighting for TSMC capacity as Nvidia takes center stage",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "www.culpium.com"
+    ],
+    "key_facts": [
+      "Apple is fighting for TSMC capacity as Nvidia takes center stage"
+    ]
+  },
+  {
+    "id": "Q49",
+    "query": "NVIDIA NVIDIA H200 Supply Chain Constraints Easing",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "perplexity.ai"
+    ],
+    "key_facts": [
+      "NVIDIA H200 Supply Chain Constraints Easing"
+    ]
+  },
+  {
+    "id": "Q50",
+    "query": "NVIDIA Breaking: NVIDIA B100 spotted in the wild!",
+    "expected_entities": [
+      "NVIDIA"
+    ],
+    "expected_source_domains": [
+      "x.com"
+    ],
+    "key_facts": [
+      "Breaking: NVIDIA B100 spotted in the wild!"
+    ]
+  }
+]

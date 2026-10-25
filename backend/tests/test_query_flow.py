@@ -52,6 +52,7 @@ def test_query_returns_evidence_and_signal():
         assert data["confidence"]["formula"].startswith("round(100 * (")
         assert "source_trust" in data["confidence"]["factors"]
         assert all("cluster_id" in item and "cluster_size" in item for item in data["evidence"])
+        assert all("freshness_status" in item and "freshness_window_hours" in item for item in data["evidence"])
 
 
 def test_query_with_no_match_returns_empty():

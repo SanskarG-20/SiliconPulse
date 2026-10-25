@@ -21,6 +21,8 @@ class EvidenceItem(BaseModel):
     event_id: Optional[str] = Field(None, description="Unique event ID")
     cluster_id: Optional[str] = Field(None, description="Near-duplicate evidence cluster")
     cluster_size: Optional[int] = Field(None, ge=1, description="Signals in the near-duplicate cluster")
+    freshness_status: Optional[str] = Field(None, description="Whether evidence met the query freshness window")
+    freshness_window_hours: Optional[int] = Field(None, ge=1, description="Adaptive freshness window applied to this evidence")
 
 class ConfidenceInfo(BaseModel):
     """Confidence information for the query results"""

@@ -9,6 +9,7 @@ import logging
 from .company_dict import COMPANY_DICT
 from .models import EvidenceItem
 from .services.embedding_service import embed_text
+from .services.freshness_policy import filter_by_freshness
 from .services.indexed_retrieval import reciprocal_rank_fusion, rerank_results, search_local_signals
 from .services.vector_store import is_available as vector_available
 from .services.vector_store import query_similar
@@ -45,6 +46,8 @@ def _to_evidence(matched_events: list[dict]) -> list[EvidenceItem]:
                 url=event.get("url", ""),
                 company=event.get("company"),
                 event_type=event.get("event_type", "general"),
+                freshness_status=event.get("freshness_status"),
+                freshness_window_hours=event.get("freshness_window_hours"),
             )
         )
     evidence_list.sort(key=lambda x: x.timestamp, reverse=True)
@@ -97,6 +100,7 @@ async def retrieve_evidence(query_text: str, k: int = 5) -> list[EvidenceItem]:
             )]
         matched_events = reciprocal_rank_fusion(keyword_hits, vector_hits, limit=k * 10)
 
+    matched_events = filter_by_freshness(query_text, matched_events, settings.freshness_hours)
     matched_events = rerank_results(query_text, matched_events, limit=k)
 
     return _to_evidence(matched_events)[:k]

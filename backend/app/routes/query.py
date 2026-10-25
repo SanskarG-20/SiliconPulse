@@ -20,6 +20,7 @@ from ..models import (
 )
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
+from ..services.freshness_policy import filter_by_freshness
 from ..services.gemini_client import gemini_client
 from ..services.indexed_retrieval import reciprocal_rank_fusion, rerank_results, search_local_signals
 from ..services.near_duplicates import annotate_clusters
@@ -164,16 +165,8 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
             events = safe_read_jsonl(
                 data_path,
                 limit=settings.max_events_to_scan,
-                freshness_hours=settings.freshness_hours
+                freshness_hours=None,
             )
-            if not events:
-                events = safe_read_jsonl(
-                    data_path,
-                    limit=settings.max_events_to_scan,
-                    freshness_hours=None
-                )
-                if events:
-                    logger.info(f"[{request_id}] No fresh events in {settings.freshness_hours}h window, fell back to stale ({len(events)} items)")
 
             vector_hits: dict[str, float] = {}
             if vector_available() and bool(events):
@@ -229,6 +222,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                     unique_matched.append(event)
             matched_events = unique_matched
 
+        matched_events = filter_by_freshness(body.query, matched_events, settings.freshness_hours)
         matched_events = rerank_results(body.query, matched_events, limit=max(body.k * 10, body.k))
         evidence_list = []
         for event in matched_events:
@@ -248,7 +242,9 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                 timestamp=event.get("timestamp", ""),
                 url=event.get("url", ""),
                 company=event.get("company"),
-                event_type=event.get("event_type", "general")
+                event_type=event.get("event_type", "general"),
+                freshness_status=event.get("freshness_status"),
+                freshness_window_hours=event.get("freshness_window_hours"),
             ))
 
         evidence_list = evidence_list[:body.k]

@@ -90,6 +90,3 @@ def test_metrics_includes_workers():
     assert "workers" in data
     assert "queue" in data
     assert "vector_signals" in data
-
-
-\n

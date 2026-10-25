@@ -4,7 +4,7 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 python-dotenv==1.0.1
 google-genai==1.30.0
-google-generativeai==0.8.3  # legacy fallback, remove after migration
+google-generativeai==0.8.6  # legacy fallback, remove after migration
 PyJWT[crypto]==2.10.1
 supabase==2.15.1
 httpx==0.28.1

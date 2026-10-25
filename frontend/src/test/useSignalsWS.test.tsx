@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { useSignalsWS } from '../../hooks/useSignalsWS';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { fallbackSignalPollInterval, useSignalsWS } from '../../hooks/useSignalsWS';
 import { createSignalsWsTicket } from '../../api/siliconpulseApi';
 
 vi.mock('../../api/siliconpulseApi', () => ({
@@ -31,7 +31,6 @@ describe('useSignalsWS credentials', () => {
     vi.stubGlobal('WebSocket', MockWebSocket);
     vi.mocked(createSignalsWsTicket).mockResolvedValue('one-time-ticket');
     const { unmount } = renderHook(() => useSignalsWS({
-      token: 'clerk-jwt-secret',
       enabled: true,
       onSignals: vi.fn(),
       baseUrl: 'https://api.example.test/api',
@@ -40,6 +39,23 @@ describe('useSignalsWS credentials', () => {
     await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
     expect(MockWebSocket.instances[0].url).toBe('wss://api.example.test/api/ws/signals?ticket=one-time-ticket');
     expect(MockWebSocket.instances[0].url).not.toContain('clerk-jwt-secret');
+    unmount();
+  });
+
+  it('keeps one socket when auth tokens refresh and pauses polling only while open', async () => {
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    vi.mocked(createSignalsWsTicket).mockResolvedValue('one-time-ticket');
+    const { rerender, unmount } = renderHook(({ ready }: { ready: boolean }) => useSignalsWS({
+      enabled: ready,
+      onSignals: vi.fn(),
+    }), { initialProps: { ready: true } });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    rerender({ ready: true });
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(fallbackSignalPollInterval('open')).toBe(0);
+    expect(fallbackSignalPollInterval('connecting')).toBe(5000);
+    expect(fallbackSignalPollInterval('closed')).toBe(5000);
+    act(() => MockWebSocket.instances[0].onopen?.(new Event('open')));
     unmount();
   });
 });

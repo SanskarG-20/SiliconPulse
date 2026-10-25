@@ -11,6 +11,7 @@ from ..core.limiter import limiter
 from ..graph.store import get_impact, get_suppliers
 from ..retrieval import retrieve_evidence
 from ..services.gemini_client import gemini_client
+from ..services.embedding_service import embed_texts
 from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, apply_computed_report_confidence, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..models import InsightReport
 from ..settings import settings
@@ -67,11 +68,19 @@ async def compare_companies(request: Request, body: CompareRequest, user=Depends
     if user_id:
         ensure_user(user_id, user.get("email"))
 
+    queries = [f"{company} {body.query}".strip() if body.query.strip() else company for company in companies]
+    try:
+        query_embeddings = await embed_texts(queries, user_id=user_id)
+    except Exception as exc:
+        from ..services.llm_budget import LLMBudgetExceeded, LLMBudgetUnavailable
+        if not isinstance(exc, (LLMBudgetExceeded, LLMBudgetUnavailable)):
+            logger.warning("compare embedding batch failed: %s", exc)
+        query_embeddings = [None] * len(queries)
+
     results = []
-    for company in companies:
-        q = f"{company} {body.query}".strip() if body.query.strip() else company
+    for company, q, query_embedding in zip(companies, queries, query_embeddings):
         try:
-            evidence = await retrieve_evidence(q, k=body.k)
+            evidence = await retrieve_evidence(q, k=body.k, user_id=user_id, query_embedding=query_embedding)
         except Exception as e:
             logger.warning(f"compare retrieval failed for {company}: {e}")
             evidence = []
@@ -170,7 +179,9 @@ Compare these companies head-to-head using the counts and graph relationships in
 USER CONTEXT: {body.query or 'recent signals'}
 {untrusted_block("COMPARISON_DATA", {"companies": companies, "per_company": lines, "graph_overlap": overlap_lines})}
 {untrusted_block("RETRIEVED_EVIDENCE", evidence_context)}"""
-            raw = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+            raw = await gemini_client.generate_content_with_fallback(
+                prompt, response_schema=InsightReport, user_id=user_id
+            )
             validated = validate_insight_report(raw)
             validated, omitted_claims = ground_insight_report(validated, evidence_context)
             apply_computed_report_confidence(validated, context_evidence_records(evidence_context))

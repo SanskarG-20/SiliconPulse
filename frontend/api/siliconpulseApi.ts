@@ -243,6 +243,7 @@ export const generateInsight = async (query: string, context: string, onChunk?: 
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Accept": "text/event-stream",
             },
             body: JSON.stringify({ query, context }),
         }, INSIGHT_TIMEOUT_MS);
@@ -251,7 +252,52 @@ export const generateInsight = async (query: string, context: string, onChunk?: 
         }
         
         const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("text/plain")) {
+        if (contentType && contentType.includes("text/event-stream")) {
+            if (!response.body) throw new Error("ReadableStream not supported by this browser.");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let fullText = "";
+            let completed = false;
+            const processEvent = (block: string) => {
+                let eventName = "message";
+                const data: string[] = [];
+                for (const line of block.replace(/\r/g, "").split("\n")) {
+                    if (line.startsWith("event:")) eventName = line.slice(6).trim();
+                    else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+                }
+                if (!data.length) return;
+                const payloadText = data.join("\n");
+                if (eventName === "delta") {
+                    const payload = JSON.parse(payloadText);
+                    fullText += String(payload.text || "");
+                    if (onChunk) onChunk(fullText);
+                } else if (eventName === "done") {
+                    const payload = JSON.parse(payloadText);
+                    if (typeof payload.insight === "string") fullText = payload.insight;
+                    completed = true;
+                    if (onChunk) onChunk(fullText);
+                } else if (eventName === "error") {
+                    const payload = JSON.parse(payloadText);
+                    throw new Error(`SSE:${String(payload.message || "Report generation failed")}`);
+                }
+            };
+
+            while (true) {
+                const { done, value } = await reader.read();
+                buffer += decoder.decode(value, { stream: !done });
+                let boundary = buffer.indexOf("\n\n");
+                while (boundary >= 0) {
+                    processEvent(buffer.slice(0, boundary));
+                    buffer = buffer.slice(boundary + 2);
+                    boundary = buffer.indexOf("\n\n");
+                }
+                if (done) break;
+            }
+            if (buffer.trim()) processEvent(buffer);
+            if (!completed) throw new Error("SSE:Report stream ended before completion");
+            return fullText || "Insight generation returned an empty response.";
+        } else if (contentType && contentType.includes("text/plain")) {
             // Handle streaming text
             if (!response.body) throw new Error("ReadableStream not yet supported in this browser.");
             const reader = response.body.getReader();
@@ -286,6 +332,9 @@ export const generateInsight = async (query: string, context: string, onChunk?: 
         // (slow/quota-hit Gemini cascade) need different user action than HTTP errors.
         if (error?.name === "AbortError") {
             return "Insight generation timed out after 30 seconds — Gemini is slow or over quota. The evidence above is still live. Wait a moment, then try again.";
+        }
+        if (typeof error?.message === "string" && error.message.startsWith("SSE:")) {
+            return `Insight generation unavailable: ${error.message.slice(4)}`;
         }
         const status = error?.message?.match(/status:\s*(\d{3})/)?.[1];
         if (status === "429") {
@@ -600,18 +649,26 @@ export const fetchApiKeys = async (): Promise<any[]> => {
     }
 };
 
-export const createApiKey = async (name: string): Promise<any | null> => {
+export const createApiKey = async (name: string, scopes: string[] = ['signals:read', 'query:read', 'trends:read', 'compare:read', 'reports:generate'], expiresInDays = 90): Promise<any | null> => {
     try {
         const response = await apiFetch(`/keys`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ name, scopes, expires_in_days: expiresInDays }),
         });
         if (!response.ok) return null;
         return await parseJsonSafely(response, null);
     } catch {
         return null;
     }
+};
+
+export const rotateApiKey = async (id: string): Promise<any | null> => {
+    try {
+        const response = await apiFetch(`/keys/${encodeURIComponent(id)}/rotate`, { method: 'POST' });
+        if (!response.ok) return null;
+        return await parseJsonSafely(response, null);
+    } catch { return null; }
 };
 
 export const revokeApiKey = async (id: string): Promise<any[]> => {

@@ -7,6 +7,31 @@ on:
     branches: [main, develop]
 
 jobs:
+  security:
+    name: Dependency, SAST & Secret Scans
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install audit tools
+        run: python -m pip install pip-audit bandit cvss requests
+      - name: Audit Python dependencies
+        run: |
+          pip-audit -r backend/requirements.txt --strict --format json --output pip-audit.json || audit_status=$?
+          if [ "${audit_status:-0}" -gt 1 ]; then exit "$audit_status"; fi
+          python backend/scripts/fail_high_pip_audit.py pip-audit.json
+      - name: Run Bandit high severity checks
+        run: bandit -r backend/app -lll
+      - name: Audit npm dependencies
+        working-directory: ./frontend
+        run: npm audit --audit-level=high
+      - name: Scan repository secrets
+        uses: gitleaks/gitleaks-action@v3
+
   backend:
     name: Backend Tests & Lint
     runs-on: ubuntu-latest

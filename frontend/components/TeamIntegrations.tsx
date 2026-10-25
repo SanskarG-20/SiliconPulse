@@ -3,6 +3,7 @@ import { KeyRound, Webhook, Plus, Trash2, Copy, Check, Send } from 'lucide-react
 import {
   fetchApiKeys,
   createApiKey,
+  rotateApiKey,
   revokeApiKey,
   fetchWebhooks,
   addWebhook,
@@ -13,6 +14,8 @@ import {
 export const TeamIntegrations: React.FC = () => {
   const [keys, setKeys] = useState<any[]>([]);
   const [keyName, setKeyName] = useState('');
+  const [keyScopes, setKeyScopes] = useState(['signals:read', 'query:read', 'trends:read', 'compare:read', 'reports:generate']);
+  const [keyExpiryDays, setKeyExpiryDays] = useState(90);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [hooks, setHooks] = useState<any[]>([]);
@@ -29,12 +32,21 @@ export const TeamIntegrations: React.FC = () => {
   }, []);
 
   const handleCreateKey = async () => {
-    const res = await createApiKey(keyName.trim() || 'default');
+    const res = await createApiKey(keyName.trim() || 'default', keyScopes, keyExpiryDays);
     if (res?.key) {
       setNewKey(res.key);
       setCopied(false);
       setKeys(await fetchApiKeys());
       setKeyName('');
+    }
+  };
+
+  const handleRotateKey = async (id: string) => {
+    const res = await rotateApiKey(id);
+    if (res?.key) {
+      setNewKey(res.key);
+      setCopied(false);
+      setKeys(await fetchApiKeys());
     }
   };
 
@@ -88,6 +100,16 @@ export const TeamIntegrations: React.FC = () => {
             <Plus size={13} /> Create
           </button>
         </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-[10px] text-[#64748B]">
+          {['signals:read', 'query:read', 'trends:read', 'compare:read', 'reports:generate'].map((scope) => (
+            <label key={scope} className="inline-flex items-center gap-1"><input type="checkbox" checked={keyScopes.includes(scope)} onChange={(e) => setKeyScopes((current) => e.target.checked ? [...current, scope] : current.filter((value) => value !== scope))} />{scope}</label>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 mb-2 text-[10px] text-[#64748B]">Expires in
+          <select value={keyExpiryDays} onChange={(e) => setKeyExpiryDays(Number(e.target.value))} className="rounded-md border border-slate-300 dark:border-[#1C3553] bg-white dark:bg-[#050B1A] px-2 py-1 text-[11px]">
+            {[30, 90, 180, 365].map((days) => <option key={days} value={days}>{days} days</option>)}
+          </select>
+        </label>
         {newKey && (
           <button
             onClick={handleCopyKey}
@@ -103,7 +125,10 @@ export const TeamIntegrations: React.FC = () => {
             {keys.map((k: any) => (
               <li key={k.id} className="flex items-center gap-2 rounded-full bg-white dark:bg-[#050B1A] border border-slate-200 dark:border-[#1C3553]/40 px-2.5 py-1.5">
                 <span className="text-[12px] font-semibold text-slate-800 dark:text-[#E2E8F0] truncate">{k.name}</span>
-                <span className="mono text-[10px] text-[#475569]">{k.key_prefix}…{k.revoked ? ' • revoked' : ''}</span>
+                <span className="mono text-[10px] text-[#475569]">{k.key_prefix}…{k.revoked ? ' • revoked' : ''} • {Array.isArray(k.scopes) ? k.scopes.join(',') : 'legacy scopes'}{k.expires_at ? ` • exp ${new Date(k.expires_at).toLocaleDateString()}` : ''}</span>
+                {!k.revoked && (
+                  <button onClick={() => handleRotateKey(k.id)} className="ml-auto p-1 rounded-full text-[#475569] hover:text-amber-500 transition-colors" aria-label={`Rotate ${k.name}`}>Rotate</button>
+                )}
                 {!k.revoked && (
                   <button onClick={async () => setKeys(await revokeApiKey(k.id))} className="ml-auto p-1 rounded-full text-[#475569] hover:text-red-400 transition-colors" aria-label={`Revoke ${k.name}`}>
                     <Trash2 size={12} />

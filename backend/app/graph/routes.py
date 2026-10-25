@@ -140,7 +140,9 @@ INSTRUCTIONS:
 """
             from ..services.secure_prompt import validate_insight_report
 
-            raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+            raw_report = await gemini_client.generate_content_with_fallback(
+                prompt, response_schema=InsightReport, user_id=user.get("user_id")
+            )
             validated = validate_insight_report(raw_report)
             validated, omitted_claims = ground_insight_report(validated, simulation_context)
             apply_computed_report_confidence(validated, context_evidence_records(simulation_context))

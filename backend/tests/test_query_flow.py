@@ -136,6 +136,85 @@ def test_generate_with_evidence_calls_gemini():
         mock_gen.assert_called_once()
 
 
+def test_generate_report_cache_reuses_only_same_evidence_snapshot():
+    query_cache.clear()
+    raw = '{"sections":[{"id":"evidence","title":"Evidence"},{"id":"confidence","title":"Confidence","value":"Low","reason":"Single source"},{"id":"ceo","title":"Summary","text":"Review the evidence."}]}'
+    with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock, return_value=raw) as mock_gen:
+        with patch("app.routes.query.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.gemini_model = "gemini-1.5-flash"
+            body = {"query": "NVIDIA   impact?", "context": "[2026-08-20T12:00:00Z | Reuters] NVIDIA expands AI infrastructure\nSnippet: NVIDIA announced an expansion."}
+            first = client.post("/api/generate", json=body)
+            second = client.post("/api/generate", json={**body, "query": "nvidia impact?"})
+            changed_evidence = client.post("/api/generate", json={**body, "context": body["context"] + "\n[2026-08-21T12:00:00Z | Bloomberg] NVIDIA opens new campus\nSnippet: NVIDIA opened a campus."})
+
+    assert first.status_code == second.status_code == changed_evidence.status_code == 200
+    assert mock_gen.await_count == 2
+    query_cache.clear()
+
+
+def test_llm_budget_exhaustion_returns_evidence_only_report():
+    from app.services.llm_budget import LLMBudgetExceeded
+
+    with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock, side_effect=LLMBudgetExceeded("limit")):
+        with patch("app.routes.query.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.gemini_model = "gemini-1.5-flash"
+            response = client.post("/api/generate", json={
+                "query": "NVIDIA impact",
+                "context": "[2026-08-20T12:00:00Z | Reuters] NVIDIA expands capacity\nSnippet: NVIDIA announced a capacity expansion.",
+            })
+
+    assert response.status_code == 200
+    assert "synthesis was deferred" in response.json()["insight"]
+
+
+def test_generate_sse_streams_only_validated_report_chunks():
+    query_cache.clear()
+    raw = '{"sections":[{"id":"evidence","title":"Evidence"},{"id":"confidence","title":"Confidence","value":"Low","reason":"Single source"},{"id":"ceo","title":"Summary","text":"Review the evidence."}]}'
+
+    async def provider_stream(*args, **kwargs):
+        yield raw[:45]
+        yield raw[45:]
+
+    with patch("app.routes.query.gemini_client.generate_content_stream_with_fallback", new=provider_stream), \
+         patch("app.routes.query.settings") as mock_settings:
+        mock_settings.gemini_api_key = "fake-key"
+        mock_settings.gemini_model = "gemini-1.5-flash"
+        response = client.post(
+            "/api/generate",
+            json={"query": "NVIDIA impact", "context": "[2026-08-20T12:00:00Z | Reuters] NVIDIA expands AI infrastructure\nSnippet: NVIDIA announced an expansion."},
+            headers={"Accept": "text/event-stream"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: status" in response.text
+    assert "event: delta" in response.text
+    assert "event: done" in response.text
+    assert "Insight generation unavailable" not in response.text
+    query_cache.clear()
+
+
+def test_generate_sse_rejects_invalid_output_without_streaming_report_text():
+    async def invalid_stream(*args, **kwargs):
+        yield '{"sections":[]}'
+
+    with patch("app.routes.query.gemini_client.generate_content_stream_with_fallback", new=invalid_stream), \
+         patch("app.routes.query.settings") as mock_settings:
+        mock_settings.gemini_api_key = "fake-key"
+        mock_settings.gemini_model = "gemini-1.5-flash"
+        response = client.post(
+            "/api/generate",
+            json={"query": "NVIDIA", "context": "[2026-08-20T12:00:00Z | Reuters] NVIDIA update\nSnippet: NVIDIA announces an update."},
+            headers={"Accept": "text/event-stream"},
+        )
+
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "event: delta" not in response.text
+
+
 def test_generate_rejects_nonconforming_model_output():
     with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock) as mock_gen:
         mock_gen.return_value = '{"sections": [], "extra": "not allowed"}'

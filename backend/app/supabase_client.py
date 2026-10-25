@@ -402,12 +402,12 @@ def mark_digest_sent(user_id: str) -> None:
         logger.debug(f"mark_digest_sent failed for {user_id}: {exc}")
 
 
-def create_api_key(user_id: str, name: str, key_hash: str, key_prefix: str) -> dict | None:
+def create_api_key(user_id: str, name: str, key_hash: str, key_prefix: str, scopes: list[str] | None = None, expires_at: str | None = None) -> dict | None:
     client = get_supabase_client()
     if client is None or not user_id:
         return None
     try:
-        resp = client.table("api_keys").insert({"user_id": user_id, "name": name[:80], "key_hash": key_hash, "key_prefix": key_prefix}).execute()
+        resp = client.table("api_keys").insert({"user_id": user_id, "name": name[:80], "key_hash": key_hash, "key_prefix": key_prefix, "scopes": scopes or ["signals:read", "query:read", "trends:read", "compare:read", "reports:generate"], "expires_at": expires_at}).execute()
         data = resp.data or []
         return data[0] if data else None
     except Exception as exc:
@@ -420,7 +420,7 @@ def list_api_keys(user_id: str) -> list[dict]:
     if client is None or not user_id:
         return []
     try:
-        resp = client.table("api_keys").select("id,name,key_prefix,revoked,last_used_at,created_at").eq("user_id", user_id).order("created_at", desc=True).execute()
+        resp = client.table("api_keys").select("id,name,key_prefix,scopes,expires_at,revoked,last_used_at,created_at").eq("user_id", user_id).order("created_at", desc=True).execute()
         return resp.data or []
     except Exception as exc:
         logger.debug(f"list_api_keys failed for {user_id}: {exc}")
@@ -439,13 +439,33 @@ def revoke_api_key(user_id: str, key_id: str) -> bool:
         return False
 
 
+def rotate_api_key(user_id: str, key_id: str, key_hash: str, key_prefix: str, expires_at: str) -> dict | None:
+    """Atomically revoke an owned key and issue its replacement."""
+    client = get_supabase_client()
+    if client is None or not user_id:
+        return None
+    try:
+        resp = client.rpc("rotate_user_api_key", {
+            "p_user_id": user_id,
+            "p_old_key_id": key_id,
+            "p_key_hash": key_hash,
+            "p_key_prefix": key_prefix,
+            "p_expires_at": expires_at,
+        }).execute()
+        rows = resp.data or []
+        return rows[0] if rows and isinstance(rows[0], dict) else None
+    except Exception as exc:
+        logger.debug("rotate_api_key failed for %s: %s", key_id, exc)
+        return None
+
+
 def lookup_api_key(key_hash: str) -> dict | None:
     """Service-role lookup for API-key auth fallback. Returns row or None."""
     client = get_supabase_client()
     if client is None or not key_hash:
         return None
     try:
-        resp = client.table("api_keys").select("id,user_id,revoked").eq("key_hash", key_hash).eq("revoked", False).single().execute()
+        resp = client.table("api_keys").select("id,user_id,revoked,scopes,expires_at").eq("key_hash", key_hash).eq("revoked", False).single().execute()
         return resp.data if resp.data else None
     except Exception as exc:
         logger.debug(f"lookup_api_key failed: {exc}")

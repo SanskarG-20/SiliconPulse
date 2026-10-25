@@ -6,7 +6,7 @@ import { INITIAL_LIVE_FEED } from '../constants';
 import { buildLiveFeed, createLiveEvent, getRelativeTimeLabel, rotateFeed } from '../utils/feedUtils';
 import { generateRecommendationsFromFeed } from '../utils/recommendationUtils';
 import { resolveTrustLevel } from '../utils/sourceMapping';
-import { useSignalsWS, WSStatus } from './useSignalsWS';
+import { fallbackSignalPollInterval, useSignalsWS, WSStatus } from './useSignalsWS';
 import { 
   querySiliconPulse, 
   injectSignal, 
@@ -314,7 +314,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
   // SWR: poll signals (paused when WS live; fallback when WS closed/error)
   const { data: swrSignals, error: swrError, mutate: mutateSignals } = useSWR('signals', fetchSignals, {
-    refreshInterval: (wsStatus === 'open') ? 0 : 5000,
+    refreshInterval: fallbackSignalPollInterval(wsStatus),
     dedupingInterval: 4000,
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
@@ -337,23 +337,22 @@ export const useDashboard = (): UseDashboardReturn => {
     }
   }, [swrSignals, swrError, processSignals]);
 
-  // Refresh WS auth token periodically (Clerk tokens expire ~60s)
+  // Readiness only: createSignalsWsTicket gets a fresh bearer token at connect time.
+  // Token rotation while the socket is healthy must not restart the socket effect.
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
       try {
         const t = await getToken();
-        if (!cancelled) setWsToken(t);
+        if (!cancelled && t) setWsToken('ready');
       } catch { /* ignore */ }
     };
     refresh();
-    const iv = window.setInterval(refresh, 45000);
-    return () => { cancelled = true; window.clearInterval(iv); };
+    return () => { cancelled = true; };
   }, [getToken]);
 
   useSignalsWS({
-    token: wsToken,
-    enabled: true,
+    enabled: Boolean(wsToken),
     onSignals: processSignals,
     onStatusChange: handleWSStatus,
   });

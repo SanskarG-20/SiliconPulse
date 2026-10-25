@@ -92,6 +92,38 @@ def test_embedding_with_mock():
         assert res == FAKE_VEC
 
 
+def test_embedding_batches_multiple_texts_in_one_provider_call():
+    from app.services import embedding_service as es
+
+    class FakeEmb:
+        values = FAKE_VEC
+
+    class FakeResp:
+        embeddings = [FakeEmb(), FakeEmb()]
+
+    class FakeModels:
+        calls = []
+
+        async def embed_content(self, model, contents, config=None):
+            self.calls.append(list(contents))
+            return FakeResp()
+
+    class FakeAio:
+        models = FakeModels()
+
+    class FakeClient:
+        aio = FakeAio()
+
+    texts = ["unique batch text one", "unique batch text two"]
+    with patch.object(es.settings, "gemini_api_key", "fake"), patch("google.genai.Client", return_value=FakeClient()), \
+         patch("app.services.llm_budget.reserve", return_value=None), patch("app.services.llm_budget.settle"):
+        import asyncio
+        result = asyncio.run(es.embed_texts(texts))
+
+    assert result == [FAKE_VEC, FAKE_VEC]
+    assert FakeClient.aio.models.calls == [texts]
+
+
 def test_hybrid_query_vector_merge():
     _clear_query_cache()
     events = [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import jwt
@@ -38,14 +39,46 @@ def _verify_api_key(raw_key: str) -> Optional[dict]:
         row = lookup_api_key(key_hash)
         if not row or not row.get("user_id"):
             return None
+        expires_at = row.get("expires_at")
+        if expires_at:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=timezone.utc)
+                if expiry <= datetime.now(timezone.utc):
+                    return None
+            except (TypeError, ValueError):
+                return None
         try:
             touch_api_key(row.get("id", ""))
         except Exception:
             pass
-        return {"user_id": row["user_id"], "email": None, "via": "api_key", "key_id": row.get("id")}
+        scopes = row.get("scopes")
+        if scopes is None:
+            scopes = ["signals:read", "query:read", "trends:read", "compare:read", "reports:generate"]
+        return {"user_id": row["user_id"], "email": None, "via": "api_key", "key_id": row.get("id"), "scopes": scopes}
     except Exception as e:
         logger.debug(f"API key verification failed: {e}")
         return None
+
+
+def _api_key_scope_for_request(method: str, path: str) -> str | None:
+    if method == "POST" and path == "/api/query":
+        return "query:read"
+    if method == "GET" and path == "/api/radar":
+        return "signals:read"
+    if method == "GET" and path == "/api/trends":
+        return "trends:read"
+    if method == "POST" and path == "/api/compare":
+        return "compare:read"
+    if method == "POST" and path == "/api/generate":
+        return "reports:generate"
+    if method == "GET" and (
+        path.startswith(("/api/signals", "/api/videos", "/api/recommendations", "/api/graph/"))
+        or path.startswith("/api/briefs/public/")
+    ):
+        return "signals:read"
+    return None
 
 
 def _get_signing_key(token: str):
@@ -70,6 +103,9 @@ def get_current_user(
         if raw_key:
             identity = _verify_api_key(raw_key)
             if identity:
+                required_scope = _api_key_scope_for_request(request.method.upper(), request.url.path)
+                if required_scope is None or required_scope not in identity.get("scopes", []):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key scope is insufficient")
                 return identity
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

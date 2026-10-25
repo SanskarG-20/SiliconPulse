@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 
 from app.settings import settings
 
@@ -23,7 +24,7 @@ def _text_key(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-async def embed_texts(texts: list[str]) -> list[list[float] | None]:
+async def embed_texts(texts: list[str], user_id: str | None = None) -> list[list[float] | None]:
     """
     Embed a batch of texts. Returns list aligned with input; None on failure per item.
     Uses cache; only sends cache misses to the API.
@@ -44,6 +45,10 @@ async def embed_texts(texts: list[str]) -> list[list[float] | None]:
     if not misses:
         return results
 
+    from .llm_budget import estimate_tokens, reserve, settle
+    reserved_tokens = sum(estimate_tokens(text) for _, text in misses)
+    reservation = reserve(user_id, reserved_tokens)
+    started = time.perf_counter()
     try:
         from google import genai as genai_new
 
@@ -67,6 +72,19 @@ async def embed_texts(texts: list[str]) -> list[list[float] | None]:
             )
         resp = await asyncio.wait_for(coro, timeout=15)
         embeddings = getattr(resp, "embeddings", None) or []
+        usage = getattr(resp, "usage_metadata", None)
+        actual_tokens = getattr(usage, "total_token_count", None) if usage is not None else None
+        settle(reservation, actual_tokens)
+        from ..observability import record_llm_call
+        record_llm_call(
+            model=EMBED_MODEL,
+            operation="embed_batch",
+            input_tokens=int(actual_tokens or reserved_tokens),
+            output_tokens=0,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            status="ok",
+            token_source="provider" if actual_tokens is not None else "estimated",
+        )
         for (idx, txt), emb in zip(misses, embeddings):
             vec = getattr(emb, "values", None)
             if vec:
@@ -84,14 +102,16 @@ async def embed_texts(texts: list[str]) -> list[list[float] | None]:
                 _cache[key] = vec
                 results[idx] = vec
     except Exception as e:
+        from ..observability import record_llm_call
+        record_llm_call(model=EMBED_MODEL, operation="embed_batch", input_tokens=reserved_tokens, output_tokens=0, latency_ms=(time.perf_counter() - started) * 1000, status="error")
         logger.warning(f"Embedding batch failed: {e}")
 
     return results
 
 
-async def embed_text(text: str) -> list[float] | None:
+async def embed_text(text: str, user_id: str | None = None) -> list[float] | None:
     """Embed a single text."""
-    res = await embed_texts([text])
+    res = await embed_texts([text], user_id=user_id)
     return res[0] if res else None
 
 

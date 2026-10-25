@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -40,6 +41,16 @@ class Settings(BaseSettings):
     newsapi_api_key: str = ""
     youtube_api_key: str = ""  # YouTube Data API v3 key for Intelligence Videos
     redis_url: str = ""  # optional: redis://... for distributed rate limiting
+
+    # Shared LLM usage controls (daily UTC reset).
+    llm_daily_token_budget: int = 500_000
+    llm_user_daily_calls: int = 50
+    llm_max_output_tokens: int = 2048
+    gemini_input_cost_usd_per_million: Optional[float] = None
+    gemini_output_cost_usd_per_million: Optional[float] = None
+    otel_exporter_otlp_endpoint: str = ""
+    otel_service_name: str = "siliconpulse-api"
+    ingestion_lag_alert_seconds: int = 3600
 
     # Distributed workers (1M+ events/day)
     worker_count: int = 4

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import time
@@ -5,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
@@ -24,7 +26,7 @@ from ..services.freshness_policy import filter_by_freshness
 from ..services.gemini_client import gemini_client
 from ..services.indexed_retrieval import reciprocal_rank_fusion, rerank_results, search_local_signals
 from ..services.near_duplicates import annotate_clusters
-from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, apply_computed_report_confidence, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
 from ..services.vector_store import query_similar
 from ..settings import settings
@@ -33,6 +35,16 @@ from ..utils import compute_confidence, extract_companies, safe_read_jsonl
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
+
+
+def _validated_report_json(raw: str, context: str) -> tuple[str, int]:
+    report = validate_insight_report(raw)
+    report, omitted = ground_insight_report(report, context)
+    apply_computed_report_confidence(report, context_evidence_records(context))
+    if omitted:
+        confidence_section = next(section for section in report.sections if section.id == "confidence")
+        confidence_section.reason += f" {omitted} unsupported claim(s) were omitted because citations did not verify."
+    return report.model_dump_json(), omitted
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -99,7 +111,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
         if vector_available():
             try:
                 from ..services.vector_store import query_hybrid
-                q_emb = await embed_text(body.query)
+                q_emb = await embed_text(body.query, user_id=user.get("user_id"))
                 if q_emb:
                     # Construct keyword text with aliases for full text search
                     raw_keywords = [kw.lower() for kw in body.query.split() if len(kw) > 2]
@@ -150,7 +162,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
                 if vector_available():
                     try:
                         if q_emb is None:
-                            q_emb = await embed_text(body.query)
+                            q_emb = await embed_text(body.query, user_id=user.get("user_id"))
                         if q_emb:
                             vector_hits = query_similar(q_emb, k=min(100, settings.max_events_to_scan))
                     except Exception as ve:
@@ -171,7 +183,7 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
             vector_hits: dict[str, float] = {}
             if vector_available() and bool(events):
                 try:
-                    q_emb = await embed_text(body.query)
+                    q_emb = await embed_text(body.query, user_id=user.get("user_id"))
                     if q_emb:
                         similar = query_similar(q_emb, k=min(30, len(events) * 2))
                         for hit in similar:
@@ -460,6 +472,18 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
             logger.warning(f"Graph enrichment failed: {ge}")
         graph_context = "\n".join(graph_parts) if graph_parts else "No supply-chain graph data for query."
 
+        evidence_payload = {
+            "records": sorted(context_evidence_records(body.context), key=lambda item: (item["source"], item["timestamp"], item["title"])),
+            "graph": graph_context,
+        }
+        evidence_hash = hashlib.sha256(
+            json.dumps(evidence_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        cached_report = query_cache.get_report(body.query, evidence_hash)
+        if cached_report is not None:
+            logger.info("Report cache hit request_id=%s", getattr(request.state, "request_id", ""))
+            return GenerateResponse(insight=cached_report)
+
         from ..models import InsightReport
         
         prompt = f"""You are SiliconPulse, an evidence-based semiconductor and AI supply-chain analyst.
@@ -474,34 +498,80 @@ USER QUERY: {body.query}
 {untrusted_block("GRAPH_CONTEXT", graph_context)}
 """
 
-        raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+        from ..services.llm_budget import LLMBudgetExceeded, LLMBudgetUnavailable
+
+        def persist_report(report_text: str, status: str = "success"):
+            if user_id:
+                ensure_user(user_id, user_email)
+                insert_insight_record(
+                    user_id=user_id,
+                    query_text=body.query,
+                    insight=report_text,
+                    model_name=settings.gemini_model,
+                    status=status,
+                )
+
+        def budget_fallback() -> str:
+            return json.dumps({"sections": [
+                {"id": "evidence", "title": "Evidence available", "points": ["Retrieved evidence is available above; synthesis was deferred by the shared LLM usage limit."]},
+                {"id": "confidence", "title": "Confidence Meter", "value": "Low", "reason": "No generated claims were added because the LLM budget is unavailable."},
+                {"id": "ceo", "title": "Summary", "text": "Review the cited source evidence directly. Retry report synthesis after the daily allowance resets."},
+            ]})
+
+        if "text/event-stream" in request.headers.get("accept", "").lower():
+            async def report_events():
+                yield "event: status\ndata: {\"stage\":\"generating\"}\n\n"
+                try:
+                    pieces = []
+                    piece_count = 0
+                    async for piece in gemini_client.generate_content_stream_with_fallback(
+                        prompt, response_schema=InsightReport, user_id=user_id
+                    ):
+                        pieces.append(piece)
+                        piece_count += 1
+                        if piece_count % 8 == 0:
+                            yield "event: progress\ndata: {\"stage\":\"generating\"}\n\n"
+                    full_text, omitted_claims = _validated_report_json("".join(pieces), body.context)
+                    if omitted_claims:
+                        logger.info("Omitted %s report claims without verified evidence spans", omitted_claims)
+                    query_cache.set_report(body.query, evidence_hash, full_text)
+                    persist_report(full_text)
+                    for offset in range(0, len(full_text), 512):
+                        payload = json.dumps({"text": full_text[offset:offset + 512]}, ensure_ascii=False)
+                        yield f"event: delta\ndata: {payload}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'insight': full_text, 'omitted_claims': omitted_claims})}\n\n"
+                except (LLMBudgetExceeded, LLMBudgetUnavailable):
+                    fallback = budget_fallback()
+                    persist_report(fallback, "budget_degraded")
+                    yield f"event: done\ndata: {json.dumps({'insight': fallback, 'degraded': True})}\n\n"
+                except Exception as exc:
+                    logger.warning("SSE report generation failed: %s", exc)
+                    message = "Report generation returned invalid structured output" if isinstance(exc, ValueError) else "Report generation is unavailable"
+                    yield f"event: error\ndata: {json.dumps({'message': message})}\n\n"
+
+            return StreamingResponse(
+                report_events(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
         try:
-            validated_report = validate_insight_report(raw_report)
-            validated_report, omitted_claims = ground_insight_report(validated_report, body.context)
-            if omitted_claims:
-                logger.info("Omitted %s report claims without verified evidence spans", omitted_claims)
-            report_confidence = compute_confidence(context_evidence_records(body.context))
-            confidence_section = next(section for section in validated_report.sections if section.id == "confidence")
-            confidence_section.value = report_confidence["label"].title()
-            confidence_section.score = report_confidence["score"]
-            confidence_section.formula = report_confidence["formula"]
-            confidence_section.factors = report_confidence["factors"]
-            confidence_section.reason = report_confidence["reason"]
-            if omitted_claims:
-                confidence_section.reason += f" {omitted_claims} unsupported claim(s) were omitted because citations did not verify."
+            raw_report = await gemini_client.generate_content_with_fallback(
+                prompt, response_schema=InsightReport, user_id=user_id
+            )
+        except (LLMBudgetExceeded, LLMBudgetUnavailable):
+            fallback = budget_fallback()
+            persist_report(fallback, "budget_degraded")
+            return GenerateResponse(insight=fallback)
+        try:
+            full_text, omitted_claims = _validated_report_json(raw_report, body.context)
         except ValueError as exc:
             logger.warning("Gemini returned a nonconforming report for query %s", body.query[:80])
             raise HTTPException(status_code=502, detail="Report generation returned invalid structured output") from exc
-        full_text = validated_report.model_dump_json()
-        if user_id:
-            ensure_user(user_id, user_email)
-            insert_insight_record(
-                user_id=user_id,
-                query_text=body.query,
-                insight=full_text,
-                model_name=settings.gemini_model,
-                status="success",
-            )
+        if omitted_claims:
+            logger.info("Omitted %s report claims without verified evidence spans", omitted_claims)
+        query_cache.set_report(body.query, evidence_hash, full_text)
+        persist_report(full_text)
         return GenerateResponse(insight=full_text)
 
     except HTTPException:

@@ -15,24 +15,24 @@ from .supabase_client import is_supabase_enabled
 from .settings import settings
 from .storage import get_db_connection, init_db
 from .utils import now_ts
+from .observability import configure_logging, ingestion_lag_seconds, install_tracing, new_request_id, request_id_var, set_ingestion_lag_metric
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 START_TIME = time.time()
 REQUEST_COUNT = 0
 ERROR_COUNT = 0
+_LAST_INGESTION_ALERT_AT = 0.0
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
     logger.info("Starting up SiliconPulse API...")
+    from .core.limiter import validate_rate_limit_store
+    validate_rate_limit_store()
     if is_supabase_enabled():
         from .services.signal_store import check_ready
 
@@ -54,6 +54,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+install_tracing(app)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -71,13 +72,19 @@ app.add_middleware(
 # Metrics middleware
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
+    request_id = new_request_id(request.headers.get("x-request-id"))
+    request_token = request_id_var.set(request_id)
     global REQUEST_COUNT
     REQUEST_COUNT += 1
-    response = await call_next(request)
-    global ERROR_COUNT
-    if response.status_code >= 500:
-        ERROR_COUNT += 1
-    return response
+    try:
+        response = await call_next(request)
+        global ERROR_COUNT
+        if response.status_code >= 500:
+            ERROR_COUNT += 1
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        request_id_var.reset(request_token)
 
 
 # Global Exception Handler
@@ -172,6 +179,7 @@ async def ping():
 
 @app.get("/metrics", dependencies=[Depends(get_current_user)])
 async def metrics():
+    global _LAST_INGESTION_ALERT_AT
     uptime = int(time.time() - START_TIME)
     # Stream stats
     stream_path = settings.resolved_data_path
@@ -204,6 +212,19 @@ async def metrics():
     except Exception:
         w_stats = {"processed": 0, "batches": 0, "errors": 0, "workers": 0}
         w_depth = {"backend": "memory", "shards": 0}
+    ingestion_lag = None
+    try:
+        from .services.signal_store import is_enabled as canonical_store_enabled, list_events
+        from .utils import safe_read_jsonl
+        events = list_events(1) if canonical_store_enabled() else safe_read_jsonl(stream_path, limit=1)
+        ingestion_lag = ingestion_lag_seconds(events)
+        if ingestion_lag is not None:
+            set_ingestion_lag_metric(ingestion_lag)
+            if ingestion_lag > settings.ingestion_lag_alert_seconds and time.monotonic() - _LAST_INGESTION_ALERT_AT >= 300:
+                logger.warning("Ingestion lag exceeded threshold", extra={"ingestion_lag_seconds": round(ingestion_lag, 2)})
+                _LAST_INGESTION_ALERT_AT = time.monotonic()
+    except Exception as exc:
+        logger.warning("Unable to calculate ingestion lag metric: %s", exc)
     return {
         "uptime_seconds": uptime,
         "requests_total": REQUEST_COUNT,
@@ -214,5 +235,7 @@ async def metrics():
         "embedding_cache_entries": embed_cache,
         "workers": w_stats,
         "queue": w_depth,
+        "ingestion_lag_seconds": ingestion_lag,
+        "ingestion_lag_alert_threshold_seconds": settings.ingestion_lag_alert_seconds,
         "timestamp": now_ts(),
     }

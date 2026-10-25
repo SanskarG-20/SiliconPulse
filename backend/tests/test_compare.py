@@ -26,13 +26,15 @@ def test_compare_rejects_too_many():
 
 
 def test_compare_success_with_mocked_retrieval():
-    async def fake_retrieve(q, k=5):
+    async def fake_retrieve(q, k=5, **kwargs):
         if "TSMC" in q:
             return [_ev("TSMC N2 yield hits 90%", "TSMC", "Reuters"), _ev("TSMC CoWoS expands", "TSMC", "Bloomberg")]
         return [_ev("NVIDIA Blackwell launch", "NVIDIA", "Reuters")]
 
-    fake_report = '{"sections": [{"id": "evidence", "title": "Head-to-Head Evidence", "points": ["TSMC leads"]}]}'
+    fake_report = '{"sections": [{"id": "evidence", "title": "Head-to-Head Evidence", "points": []}, {"id": "confidence", "title": "Confidence", "value": "Low", "reason": "Limited evidence"}, {"id": "ceo", "title": "Summary", "text": "Comparison based on retrieved evidence."}]}'
     with patch("app.routes.compare.retrieve_evidence", side_effect=fake_retrieve), patch(
+        "app.routes.compare.embed_texts", new_callable=AsyncMock, return_value=[None, None]
+    ), patch(
         "app.routes.compare.settings"
     ) as mock_settings, patch(
         "app.routes.compare.gemini_client.generate_content_with_fallback", new_callable=AsyncMock
@@ -53,10 +55,12 @@ def test_compare_success_with_mocked_retrieval():
 
 
 def test_compare_simulated_without_key():
-    async def fake_retrieve(q, k=5):
+    async def fake_retrieve(q, k=5, **kwargs):
         return [_ev("Some signal")]
 
     with patch("app.routes.compare.retrieve_evidence", side_effect=fake_retrieve), patch(
+        "app.routes.compare.embed_texts", new_callable=AsyncMock, return_value=[None, None]
+    ), patch(
         "app.routes.compare.settings"
     ) as mock_settings:
         mock_settings.gemini_api_key = ""

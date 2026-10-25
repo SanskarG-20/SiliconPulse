@@ -24,7 +24,7 @@ CACHE_TTL_SECONDS = 1800  # 30 minutes
 
 def _cache_key(query: str, category: str, limit: int) -> str:
     raw = f"{query}:{category}:{limit}".lower().strip()
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def _get_cached(key: str) -> list[dict] | None:

@@ -175,13 +175,23 @@ class GeminiClient:
         retry=retry_if_exception_type(Exception),
         reraise=True,
     )
-    async def _generate_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None) -> str:
+    async def _generate_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None, user_id: str | None = None) -> str:
         """
         Generate content with strict timeout and retries.
         Supports both new and legacy SDKs.
         """
         # Normalize model name for new SDK (strip 'models/' prefix)
         clean_name = model_name.replace("models/", "") if model_name.startswith("models/") else model_name
+        from .llm_budget import estimate_tokens, reserve, settle
+        reservation = reserve(user_id, estimate_tokens(prompt) + settings.llm_max_output_tokens)
+
+        def usage_tokens(response):
+            usage = getattr(response, "usage_metadata", None)
+            if usage is None:
+                return None
+            prompt_count = getattr(usage, "prompt_token_count", None) or getattr(usage, "prompt_tokens", 0)
+            output_count = getattr(usage, "candidates_token_count", None) or getattr(usage, "completion_tokens", 0)
+            return int(prompt_count or 0) + int(output_count or 0)
 
         if NEW_SDK and self.client is not None:
             # New SDK: use aio client
@@ -201,6 +211,7 @@ class GeminiClient:
                     ),
                     timeout=timeout,
                 )
+                settle(reservation, usage_tokens(response))
                 # New SDK response has .text
                 return getattr(response, "text", str(response))
             except Exception as e:
@@ -223,6 +234,7 @@ class GeminiClient:
                         model.generate_content_async(prompt, **kwargs),
                         timeout=timeout,
                     )
+                    settle(reservation, usage_tokens(response))
                     return response.text
                 logger.warning(f"New SDK generate failed for {clean_name}: {e}")
                 raise
@@ -240,11 +252,12 @@ class GeminiClient:
                 model.generate_content_async(prompt, **kwargs),
                 timeout=timeout,
             )
+            settle(reservation, usage_tokens(response))
             return response.text
 
         raise RuntimeError("No Gemini SDK available for generation")
 
-    async def generate_content_with_fallback(self, prompt: str, response_schema=None) -> str:
+    async def generate_content_with_fallback(self, prompt: str, response_schema=None, user_id: str | None = None) -> str:
         """
         Generate content using available models, falling back if one is rate limited.
         Capped at MAX_FALLBACK_MODELS so one bad key/quota cannot turn into a
@@ -259,10 +272,22 @@ class GeminiClient:
             logger.info(f"Trying {len(candidates)} of {len(self.available_models)} models (capped)")
 
         for model_name in candidates:
+            from .llm_budget import estimate_tokens
+            from ..observability import record_llm_call, start_timer
+            started = start_timer()
             try:
                 logger.info(f"Attempting generation with model: {model_name}")
-                return await self._generate_with_timeout(model_name, prompt, response_schema=response_schema)
+                kwargs = {"response_schema": response_schema}
+                if user_id is not None:
+                    kwargs["user_id"] = user_id
+                output = await self._generate_with_timeout(model_name, prompt, **kwargs)
+                record_llm_call(model=model_name, operation="generate", input_tokens=estimate_tokens(prompt), output_tokens=estimate_tokens(output), latency_ms=(start_timer() - started) * 1000, status="ok")
+                return output
             except Exception as e:
+                record_llm_call(model=model_name, operation="generate", input_tokens=estimate_tokens(prompt), output_tokens=0, latency_ms=(start_timer() - started) * 1000, status="error")
+                from .llm_budget import LLMBudgetExceeded, LLMBudgetUnavailable
+                if isinstance(e, (LLMBudgetExceeded, LLMBudgetUnavailable)):
+                    raise
                 error_str = str(e)
                 logger.warning(f"Model {model_name} failed: {error_str}")
 
@@ -281,11 +306,14 @@ class GeminiClient:
         logger.error(f"All Gemini models failed. Errors: {'; '.join(errors)}")
         return "Insight generation unavailable. Please try again later."
 
-    async def _generate_stream_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None):
+    async def _generate_stream_with_timeout(self, model_name: str, prompt: str, timeout: int = 10, response_schema=None, user_id: str | None = None):
         """
         Generate content stream. Yields text chunks.
         """
         clean_name = model_name.replace("models/", "") if model_name.startswith("models/") else model_name
+        from .llm_budget import estimate_tokens, reserve, settle
+        reservation = reserve(user_id, estimate_tokens(prompt) + settings.llm_max_output_tokens)
+        actual_tokens = None
 
         if NEW_SDK and self.client is not None:
             try:
@@ -305,9 +333,15 @@ class GeminiClient:
                     timeout=timeout,
                 )
                 async for chunk in response:
+                    usage = getattr(chunk, "usage_metadata", None)
+                    if usage is not None:
+                        actual_tokens = int(
+                            getattr(usage, "prompt_token_count", 0) or 0
+                        ) + int(getattr(usage, "candidates_token_count", 0) or 0)
                     text = getattr(chunk, "text", str(chunk))
                     if text:
                         yield text
+                settle(reservation, actual_tokens)
                 return
             except Exception as e:
                 error_lower = str(e).lower()
@@ -333,11 +367,12 @@ class GeminiClient:
             async for chunk in response:
                 if chunk.text:
                     yield chunk.text
+            settle(reservation, actual_tokens)
             return
 
         raise RuntimeError("No Gemini SDK available for generation")
 
-    async def generate_content_stream_with_fallback(self, prompt: str, response_schema=None):
+    async def generate_content_stream_with_fallback(self, prompt: str, response_schema=None, user_id: str | None = None):
         """
         Generate content stream using available models.
         """
@@ -348,12 +383,22 @@ class GeminiClient:
         errors = []
 
         for model_name in self.available_models[:MAX_FALLBACK_MODELS]:
+            from .llm_budget import estimate_tokens
+            from ..observability import record_llm_call, start_timer
+            started = start_timer()
+            output_parts = []
             try:
                 logger.info(f"Attempting stream generation with model: {model_name}")
-                async for chunk in self._generate_stream_with_timeout(model_name, prompt, response_schema=response_schema):
+                async for chunk in self._generate_stream_with_timeout(model_name, prompt, response_schema=response_schema, user_id=user_id):
+                    output_parts.append(chunk)
                     yield chunk
+                record_llm_call(model=model_name, operation="generate_stream", input_tokens=estimate_tokens(prompt), output_tokens=estimate_tokens("".join(output_parts)), latency_ms=(start_timer() - started) * 1000, status="ok")
                 return
             except Exception as e:
+                record_llm_call(model=model_name, operation="generate_stream", input_tokens=estimate_tokens(prompt), output_tokens=estimate_tokens("".join(output_parts)), latency_ms=(start_timer() - started) * 1000, status="error")
+                from .llm_budget import LLMBudgetExceeded, LLMBudgetUnavailable
+                if isinstance(e, (LLMBudgetExceeded, LLMBudgetUnavailable)):
+                    raise
                 error_str = str(e)
                 logger.warning(f"Model {model_name} failed: {error_str}")
                 if "429" in error_str or "Quota exceeded" in error_str:

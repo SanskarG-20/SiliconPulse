@@ -4,6 +4,8 @@ Mirrors the retrieval stages in routes/query.py (DB hybrid -> local
 keyword + vector fallback) so comparison results stay consistent with
 single-query results. query.py itself is intentionally untouched.
 """
+from __future__ import annotations
+
 import logging
 
 from .company_dict import COMPANY_DICT
@@ -54,7 +56,7 @@ def _to_evidence(matched_events: list[dict]) -> list[EvidenceItem]:
     return evidence_list
 
 
-async def retrieve_evidence(query_text: str, k: int = 5) -> list[EvidenceItem]:
+async def retrieve_evidence(query_text: str, k: int = 5, user_id: str | None = None, query_embedding: list[float] | None = None) -> list[EvidenceItem]:
     """Retrieve top-k evidence for a query string (DB hybrid, else local fallback)."""
     k = max(1, min(k, 20))
     matched_events: list[dict] = []
@@ -64,7 +66,7 @@ async def retrieve_evidence(query_text: str, k: int = 5) -> list[EvidenceItem]:
         try:
             from .services.vector_store import query_hybrid
 
-            q_emb = await embed_text(query_text)
+            q_emb = query_embedding or await embed_text(query_text, user_id=user_id)
             if q_emb:
                 query_keywords = _expand_keywords(query_text)
                 ts_query_parts = [f'"{kw}"' if " " in kw else kw for kw in query_keywords]
@@ -83,7 +85,7 @@ async def retrieve_evidence(query_text: str, k: int = 5) -> list[EvidenceItem]:
         vector_hits = []
         if vector_available():
             try:
-                q_emb = await embed_text(query_text)
+                q_emb = query_embedding or await embed_text(query_text, user_id=user_id)
                 if q_emb:
                     vector_hits = query_similar(q_emb, k=min(100, settings.max_events_to_scan))
             except Exception as ve:

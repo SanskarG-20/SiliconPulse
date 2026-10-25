@@ -11,13 +11,14 @@ interface WSSignalsMessage {
 }
 
 interface UseSignalsWSOptions {
-  token: string | null;
   enabled: boolean;
   onSignals: (events: any[], isAppend?: boolean) => void;
   onStatusChange?: (status: WSStatus) => void;
   // Derived from VITE_API_BASE_URL: http(s)://host/api -> ws(s)://host/api/ws/signals
   baseUrl?: string;
 }
+
+export const fallbackSignalPollInterval = (status: WSStatus): number => status === 'open' ? 0 : 5000;
 
 /**
  * Live WebSocket feed for signals.
@@ -27,7 +28,6 @@ interface UseSignalsWSOptions {
  * - Reports status so UI can fall back to SWR polling when closed/error
  */
 export const useSignalsWS = ({
-  token,
   enabled,
   onSignals,
   onStatusChange,
@@ -37,6 +37,7 @@ export const useSignalsWS = ({
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const pingTimerRef = useRef<number | null>(null);
+  const pongTimeoutRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const onSignalsRef = useRef(onSignals);
   onSignalsRef.current = onSignals;
@@ -51,11 +52,12 @@ export const useSignalsWS = ({
 
   const clearTimers = () => {
     if (pingTimerRef.current) { window.clearInterval(pingTimerRef.current); pingTimerRef.current = null; }
+    if (pongTimeoutRef.current) { window.clearTimeout(pongTimeoutRef.current); pongTimeoutRef.current = null; }
     if (reconnectTimerRef.current) { window.clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
   };
 
   useEffect(() => {
-    if (!enabled || !token) {
+    if (!enabled) {
       setStatus('closed');
       onStatusRef.current?.('closed');
       return;
@@ -82,13 +84,22 @@ export const useSignalsWS = ({
         // keep-alive ping
         if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
         pingTimerRef.current = window.setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+          if (ws.readyState !== WebSocket.OPEN) return;
+          if (pongTimeoutRef.current) window.clearTimeout(pongTimeoutRef.current);
+          ws.send('ping');
+          pongTimeoutRef.current = window.setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) ws.close(4000, 'pong timeout');
+          }, 10000);
         }, 30000);
       };
 
       ws.onmessage = (ev) => {
         try {
           const msg: WSSignalsMessage = JSON.parse(ev.data);
+          if (msg.type === 'pong' && pongTimeoutRef.current) {
+            window.clearTimeout(pongTimeoutRef.current);
+            pongTimeoutRef.current = null;
+          }
           if (msg.type === 'signals' && Array.isArray(msg.events)) {
             // Check if backend instructed to append (i.e. only new events sent)
             const isAppend = msg.isAppend === true;
@@ -101,10 +112,6 @@ export const useSignalsWS = ({
         if (cancelled) return;
         setStatus('closed');
         onStatusRef.current?.('closed');
-        if (ev.code === 4401) {
-          // auth rejected - don't retry, SWR fallback will handle
-          return;
-        }
         // exponential backoff reconnect
         if (retryRef.current < 5) {
           const delay = Math.min(2000 * Math.pow(2, retryRef.current), 16000);
@@ -139,7 +146,7 @@ export const useSignalsWS = ({
       try { wsRef.current?.close(); } catch {}
       wsRef.current = null;
     };
-  }, [enabled, token, wsUrl]);
+  }, [enabled, wsUrl]);
 
   return { status };
 };

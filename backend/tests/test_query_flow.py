@@ -49,6 +49,8 @@ def test_query_returns_evidence_and_signal():
         assert "signal_strength" in data
         assert data["signal_strength"] >= 0
         assert "confidence" in data
+        assert data["confidence"]["formula"].startswith("round(100 * (")
+        assert "source_trust" in data["confidence"]["factors"]
 
 
 def test_query_with_no_match_returns_empty():
@@ -163,7 +165,9 @@ def test_generate_drops_claims_without_exact_cited_spans():
     impact = next(section for section in report["sections"] if section["id"] == "impact")
     assert impact["points"] == ["NVIDIA doubled its HBM allocation at TSMC."]
     confidence = next(section for section in report["sections"] if section["id"] == "confidence")
-    assert "3 unsupported claim(s) were omitted" in confidence["reason"]
+    assert "unsupported claim(s) were omitted" in confidence["reason"]
+    assert confidence["formula"].startswith("round(100 * (")
+    assert confidence["factors"]["independent_source_count"] == 1
 
 
 def test_inject_then_query():

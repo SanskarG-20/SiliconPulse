@@ -46,18 +46,30 @@ _CLAIM_TOKEN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 _CLAIM_STOPWORDS = {"a", "an", "as", "at", "be", "by", "for", "from", "in", "into", "is", "it", "its", "of", "on", "or", "said", "the", "to", "was", "were", "with"}
 
 
-def _context_evidence(context: str) -> dict[tuple[str, str, str], str]:
-    """Index evidence blocks formatted by the client by their citation identity."""
+def context_evidence_records(context: str) -> list[dict[str, str]]:
+    """Parse evidence blocks formatted by the client into source records."""
     matches = list(_CONTEXT_ITEM.finditer(context or ""))
-    indexed = {}
+    records = []
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(context)
         block = context[match.end():end]
         snippet = re.search(r"(?m)^Snippet:\s*(.+?)\s*$", block)
-        text = match.group("title") + " " + (snippet.group(1) if snippet else "")
-        key = (match.group("source").strip(), match.group("timestamp").strip(), match.group("title").strip())
-        indexed[key] = text
-    return indexed
+        records.append({
+            "source": match.group("source").strip(),
+            "timestamp": match.group("timestamp").strip(),
+            "title": match.group("title").strip(),
+            "snippet": snippet.group(1).strip() if snippet else "",
+            "url": (re.search(r"(?m)^URL:\s*(.+?)\s*$", block).group(1).strip() if re.search(r"(?m)^URL:\s*(.+?)\s*$", block) else ""),
+        })
+    return records
+
+
+def _context_evidence(context: str) -> dict[tuple[str, str, str], str]:
+    """Index evidence blocks by their citation identity."""
+    return {
+        (item["source"], item["timestamp"], item["title"]): f"{item['title']} {item['snippet']}"
+        for item in context_evidence_records(context)
+    }
 
 
 def _claim_supported(claim: str, evidence_text: str) -> bool:
@@ -121,3 +133,18 @@ def ground_insight_report(report: InsightReport, context: str) -> tuple[InsightR
             note = f"{dropped} unsupported claim(s) were omitted because their citations did not verify."
             confidence.reason = f"{confidence.reason} {note}".strip()
     return grounded, dropped
+
+
+def apply_computed_report_confidence(report: InsightReport, evidence: list) -> dict:
+    """Replace any model-authored confidence with the deterministic evidence score."""
+    from ..utils import compute_confidence
+
+    confidence = compute_confidence(evidence)
+    section = next((item for item in report.sections if item.id == "confidence"), None)
+    if section is not None:
+        section.value = confidence["label"].title()
+        section.score = confidence["score"]
+        section.formula = confidence["formula"]
+        section.factors = confidence["factors"]
+        section.reason = confidence["reason"]
+    return confidence

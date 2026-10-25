@@ -115,7 +115,7 @@ async def graph_simulate(request: Request, body: SimulateRequest, user=Depends(g
 
             shock_pct = int(body.shock * 100)
             from ..models import InsightReport
-            from ..services.secure_prompt import ground_insight_report, untrusted_block
+            from ..services.secure_prompt import apply_computed_report_confidence, context_evidence_records, ground_insight_report, untrusted_block
             simulation_context = (
                 "[Simulation | SiliconPulse Graph Model] Scenario computation\n"
                 f"Snippet: {impact_text}"
@@ -143,10 +143,13 @@ INSTRUCTIONS:
             raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
             validated = validate_insight_report(raw_report)
             validated, omitted_claims = ground_insight_report(validated, simulation_context)
+            apply_computed_report_confidence(validated, context_evidence_records(simulation_context))
             if omitted_claims:
                 import logging
 
                 logging.getLogger(__name__).info("Omitted %s scenario claims without verified spans", omitted_claims)
+                confidence_section = next(section for section in validated.sections if section.id == "confidence")
+                confidence_section.reason += f" {omitted_claims} unsupported claim(s) were omitted because citations did not verify."
             scenario_report = validated.model_dump_json()
         except Exception as e:
             import logging

@@ -29,6 +29,8 @@ export interface ConfidenceInfo {
   score: number;
   label: string;
   reason: string;
+  formula?: string;
+  factors?: Record<string, number | Record<string, number>>;
 }
 
 export interface QueryResponse {

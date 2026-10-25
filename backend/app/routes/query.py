@@ -21,7 +21,7 @@ from ..models import (
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
-from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, ground_insight_report, untrusted_block, validate_insight_report
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
 from ..services.vector_store import query_similar
 from ..settings import settings
@@ -220,11 +220,12 @@ async def process_query(request: Request, body: QueryRequest, user=Depends(get_c
         evidence_list.sort(key=lambda x: x.timestamp, reverse=True)
         evidence_list = evidence_list[:body.k]
 
+        confidence = compute_confidence(evidence_list)
         result = {
             "query": body.query,
             "evidence": evidence_list,
-            "signal_strength": compute_confidence(evidence_list)["score"],
-            "confidence": compute_confidence(evidence_list),
+            "signal_strength": confidence["score"],
+            "confidence": confidence,
             "last_updated": datetime.now().isoformat(),
             "report": None,
             "llm_status": "pending",
@@ -449,6 +450,15 @@ USER QUERY: {body.query}
             validated_report, omitted_claims = ground_insight_report(validated_report, body.context)
             if omitted_claims:
                 logger.info("Omitted %s report claims without verified evidence spans", omitted_claims)
+            report_confidence = compute_confidence(context_evidence_records(body.context))
+            confidence_section = next(section for section in validated_report.sections if section.id == "confidence")
+            confidence_section.value = report_confidence["label"].title()
+            confidence_section.score = report_confidence["score"]
+            confidence_section.formula = report_confidence["formula"]
+            confidence_section.factors = report_confidence["factors"]
+            confidence_section.reason = report_confidence["reason"]
+            if omitted_claims:
+                confidence_section.reason += f" {omitted_claims} unsupported claim(s) were omitted because citations did not verify."
         except ValueError as exc:
             logger.warning("Gemini returned a nonconforming report for query %s", body.query[:80])
             raise HTTPException(status_code=502, detail="Report generation returned invalid structured output") from exc

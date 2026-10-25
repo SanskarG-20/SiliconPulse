@@ -25,6 +25,8 @@ class ConfidenceInfo(BaseModel):
     score: int = Field(..., description="Numeric confidence score (0-100)")
     label: str = Field(..., description="Confidence label (LOW/MEDIUM/HIGH)")
     reason: str = Field(..., description="Reasoning for the confidence level")
+    formula: str = Field(default="", description="Formula used to compute the confidence score")
+    factors: dict = Field(default_factory=dict, description="Normalized confidence factors and weights")
 
 
 class QueryResponse(BaseModel):
@@ -122,6 +124,9 @@ class ReportSection(BaseModel):
     value: Optional[str] = Field(default=None, description="Value (e.g., 'Low', 'Medium', 'High' for confidence)")
     reason: Optional[str] = Field(default=None, description="Reasoning text")
     evidence: Optional[list[ReportEvidence]] = Field(default=None, description="List of evidence items")
+    score: Optional[int] = Field(default=None, description="Computed confidence score for the confidence section")
+    formula: Optional[str] = Field(default=None, description="Confidence formula")
+    factors: Optional[dict] = Field(default=None, description="Confidence factor breakdown")
 
 class InsightReport(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)

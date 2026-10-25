@@ -11,7 +11,7 @@ from ..core.limiter import limiter
 from ..graph.store import get_impact, get_suppliers
 from ..retrieval import retrieve_evidence
 from ..services.gemini_client import gemini_client
-from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, ground_insight_report, untrusted_block, validate_insight_report
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, apply_computed_report_confidence, context_evidence_records, ground_insight_report, untrusted_block, validate_insight_report
 from ..models import InsightReport
 from ..settings import settings
 from ..supabase_client import ensure_user
@@ -173,8 +173,11 @@ USER CONTEXT: {body.query or 'recent signals'}
             raw = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
             validated = validate_insight_report(raw)
             validated, omitted_claims = ground_insight_report(validated, evidence_context)
+            apply_computed_report_confidence(validated, context_evidence_records(evidence_context))
             if omitted_claims:
                 logger.info("Omitted %s comparison claims without verified evidence spans", omitted_claims)
+                confidence_section = next(section for section in validated.sections if section.id == "confidence")
+                confidence_section.reason += f" {omitted_claims} unsupported claim(s) were omitted because citations did not verify."
             comparison_report = validated.model_dump_json()
         except Exception as e:
             logger.warning(f"compare LLM failed: {e}")

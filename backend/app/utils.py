@@ -9,7 +9,7 @@ import json
 import logging
 import re
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -713,94 +713,77 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = 
         return []
 
 def compute_confidence(evidence: list) -> dict:
+    """Score independent sources, their trust tier, recency and corroboration.
+
+    Every factor is normalized to [0, 1]. Recency falls linearly to zero at 72h.
+    Corroboration is the share of distinct normalized titles supported by multiple
+    independent URL hosts (or source names when a URL is unavailable).
     """
-    Compute dynamic confidence score (0-100), label, and reason.
+    formula = "round(100 * (0.30 * independent_source_factor + 0.25 * source_trust + 0.20 * recency + 0.25 * corroboration))"
+    weights = {"independent_source_factor": 0.30, "source_trust": 0.25, "recency": 0.20, "corroboration": 0.25}
 
-    Rules:
-    - Evidence Count: >=6 (+50), 3-5 (+30), 1-2 (+15), 0 (+0)
-    - Recency: Latest evidence < 2h (+25), < 12h (+15), else (+5)
-    - Source Reliability: High trust (+15), Medium (+10), Low (+5)
-    """
-    if not evidence:
-        return {
-            "score": 0,
-            "label": "LOW",
-            "reason": "No evidence found in current data stream."
-        }
+    def value(item, key, default=""):
+        return item.get(key, default) if isinstance(item, dict) else getattr(item, key, default)
 
-    score = 0
-    count = len(evidence)
+    source_ids: set[str] = set()
+    source_trust: dict[str, float] = {}
+    title_sources: dict[str, set[str]] = {}
+    recency_values = []
+    now = datetime.now(timezone.utc)
+    for item in evidence:
+        source = str(value(item, "source") or "Unknown").strip()
+        url = str(value(item, "url") or "").strip()
+        host = (urlparse(url).hostname or "").lower().removeprefix("www.") if url else ""
+        source_id = host or normalize_text(source) or "unknown"
+        source_ids.add(source_id)
+        trust_name = host if source.lower() in {"", "unknown"} else source
+        tier = get_trust_info(trust_name or host).get("trust_level", "Low")
+        source_trust[source_id] = max(source_trust.get(source_id, 0.0), {"High": 1.0, "Medium": 0.65, "Low": 0.3}.get(tier, 0.3))
 
-    # 1. Evidence Count
-    if count >= 6:
-        score += 50
-    elif count >= 3:
-        score += 30
-    elif count >= 1:
-        score += 15
+        title = normalize_text(str(value(item, "title") or ""))
+        if title:
+            title_sources.setdefault(title, set()).add(source_id)
 
-    # 2. Recency Factor
-    try:
-        # Sort evidence by timestamp to find the latest
-        sorted_ev = sorted(evidence, key=lambda x: parse_timestamp(x.timestamp) if hasattr(x, 'timestamp') and x.timestamp else datetime.min, reverse=True)
-        latest_ts = sorted_ev[0].timestamp if sorted_ev and hasattr(sorted_ev[0], 'timestamp') else None
+        timestamp = str(value(item, "timestamp") or "")
+        try:
+            event_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=timezone.utc)
+            age_hours = max(0.0, (now - event_time.astimezone(timezone.utc)).total_seconds() / 3600)
+            recency_values.append(max(0.0, 1.0 - age_hours / 72.0))
+        except (TypeError, ValueError):
+            recency_values.append(0.0)
 
-        if latest_ts:
-            latest_time = parse_timestamp(latest_ts)
-            age_hours = (datetime.utcnow() - latest_time).total_seconds() / 3600
-
-            if age_hours < 2:
-                score += 25
-            elif age_hours < 12:
-                score += 15
-            else:
-                score += 5
-        else:
-            score += 5
-    except Exception as e:
-        logger.warning(f"Error computing recency for confidence: {e}")
-        score += 5
-
-    # 3. Source Reliability
-    # High trust: Reuters, Bloomberg, Official, etc.
-    # Medium: Perplexity, TechCrunch, etc.
-    # Low: X, Rumor, etc.
-    high_trust = ["reuters", "bloomberg", "official", "press release", "sec", "nasdaq"]
-    med_trust = ["perplexity", "techcrunch", "verge", "wired", "wsj", "nyt"]
-
-    sources = [str(e.source).lower() if hasattr(e, 'source') else "" for e in evidence]
-
-    source_boost = 5 # Default low
-    for s in sources:
-        if any(ht in s for ht in high_trust):
-            source_boost = 15
-            break
-        if any(mt in s for mt in med_trust):
-            source_boost = max(source_boost, 10)
-
-    score += source_boost
-
-    # Clamp
-    score = min(100, score)
-
-    # Label
-    if score >= 70:
-        label = "HIGH"
-    elif score >= 40:
-        label = "MEDIUM"
-    else:
-        label = "LOW"
-
-    # Reason
-    recency_str = "very recent" if score >= 25 else "recent" if score >= 15 else "older"
-    source_str = "reliable" if source_boost == 15 else "mixed" if source_boost == 10 else "unverified"
-
-    reason = f"{count} evidence items found, latest is {recency_str}, {source_str} sources."
-
+    independent_count = len(source_ids)
+    independent_factor = min(independent_count / 3.0, 1.0)
+    trust_factor = sum(source_trust.values()) / len(source_trust) if source_trust else 0.0
+    recency_factor = sum(recency_values) / len(recency_values) if recency_values else 0.0
+    corroborated_titles = sum(1 for sources in title_sources.values() if len(sources) >= 2)
+    corroboration_factor = corroborated_titles / len(title_sources) if title_sources else 0.0
+    score = round(100 * (
+        weights["independent_source_factor"] * independent_factor
+        + weights["source_trust"] * trust_factor
+        + weights["recency"] * recency_factor
+        + weights["corroboration"] * corroboration_factor
+    ))
+    label = "HIGH" if score >= 70 else "MEDIUM" if score >= 40 else "LOW"
+    reason = (
+        f"{independent_count} independent source(s); trust {trust_factor:.0%}; "
+        f"recency {recency_factor:.0%}; corroboration {corroboration_factor:.0%}."
+    )
     return {
         "score": score,
         "label": label,
-        "reason": reason
+        "reason": reason,
+        "formula": formula,
+        "factors": {
+            "independent_source_count": independent_count,
+            "independent_source_factor": round(independent_factor, 4),
+            "source_trust": round(trust_factor, 4),
+            "recency": round(recency_factor, 4),
+            "corroboration": round(corroboration_factor, 4),
+            "weights": weights,
+        },
     }
 
 def get_trust_info(source_name: str) -> dict:

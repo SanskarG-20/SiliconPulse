@@ -231,6 +231,7 @@ export const formatEvidenceToContext = (evidence: any[]): string => {
         context += `[${item?.timestamp || 'N/A'} | ${item?.source || 'Unknown'}] ${item?.title || 'Untitled'}\n`;
         context += `Company: ${item?.company || 'N/A'} | Event: ${item?.event_type || 'General'}\n`;
         context += `Snippet: ${item?.snippet || item?.content || ''}\n\n`;
+        if (item?.url) context += `URL: ${item.url}\n`;
     });
 
     return context;

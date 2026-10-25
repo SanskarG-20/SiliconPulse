@@ -220,6 +220,8 @@ def _context(evidence: list[dict]) -> str:
         lines.append(f"[{item.get('timestamp') or 'N/A'} | {item.get('source') or 'Unknown'}] {item.get('title') or 'Untitled'}")
         lines.append(f"Company: {item.get('company') or 'N/A'} | Event: {item.get('event_type') or 'General'}")
         lines.append(f"Snippet: {item.get('snippet') or ''}")
+        if item.get("url"):
+            lines.append(f"URL: {item['url']}")
     return "\n".join(lines)
 
 

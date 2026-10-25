@@ -21,7 +21,7 @@ from ..models import (
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
-from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, untrusted_block, validate_insight_report
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, ground_insight_report, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
 from ..services.vector_store import query_similar
 from ..settings import settings
@@ -434,7 +434,7 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
         prompt = f"""You are SiliconPulse, an evidence-based semiconductor and AI supply-chain analyst.
 {SYSTEM_INSTRUCTION_HIERARCHY}
 
-Analyze the user's query using the evidence and graph facts below. Output only one JSON object matching the supplied schema, with no markdown fences or extra fields. The sections array must contain unique section IDs and include evidence, confidence, and ceo.
+Analyze the user's query using the evidence and graph facts below. Output only one JSON object matching the supplied schema, with no markdown fences or extra fields. The sections array must contain unique section IDs and include evidence, confidence, and ceo. Every factual claim must have a section evidence citation with source, timestamp, title, and an exact verbatim span copied from that cited evidence; do not cite spans that are not present in the evidence.
 
 USER QUERY: {body.query}
 
@@ -446,6 +446,9 @@ USER QUERY: {body.query}
         raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
         try:
             validated_report = validate_insight_report(raw_report)
+            validated_report, omitted_claims = ground_insight_report(validated_report, body.context)
+            if omitted_claims:
+                logger.info("Omitted %s report claims without verified evidence spans", omitted_claims)
         except ValueError as exc:
             logger.warning("Gemini returned a nonconforming report for query %s", body.query[:80])
             raise HTTPException(status_code=502, detail="Report generation returned invalid structured output") from exc

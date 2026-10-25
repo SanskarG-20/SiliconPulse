@@ -23,8 +23,8 @@ so the benchmark measures grounding and retrieval against that corpus, not wheth
 the corpus itself is true.
 
 The harness asks Gemini for JSON matching the report schema and validates locally.
-It removes the unsupported `additionalProperties` keyword from the schema sent to
-Gemini, then applies the existing strict Pydantic validator. The API currently sends
-Pydantic's raw schema and receives a Gemini 400; this harness-side compatibility
-adapter lets the baseline measure report quality while preserving that finding for
-the product implementation.
+The provider adapter removes Gemini's unsupported `additionalProperties` keyword,
+then the backend applies strict Pydantic validation and verifies cited spans. The
+recorded baseline ran retrieval-only after the configured Gemini free-tier quota
+was exhausted; its citation and hallucination metrics are `null` until generated
+reports are available.

@@ -11,7 +11,7 @@ from ..core.limiter import limiter
 from ..graph.store import get_impact, get_suppliers
 from ..retrieval import retrieve_evidence
 from ..services.gemini_client import gemini_client
-from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, untrusted_block, validate_insight_report
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, ground_insight_report, untrusted_block, validate_insight_report
 from ..models import InsightReport
 from ..settings import settings
 from ..supabase_client import ensure_user
@@ -159,13 +159,23 @@ async def compare_companies(request: Request, body: CompareRequest, user=Depends
             overlap_lines = []
             for o in overlap["shared_downstream"][:4]:
                 overlap_lines.append(f"shared downstream {o['company']} via {', '.join(o['shared_by'])}")
+            evidence_context = "\n".join(
+                f"[{item.get('timestamp') or 'N/A'} | {item.get('source') or 'Unknown'}] {item.get('title') or 'Untitled'}\n"
+                f"Snippet: {item.get('snippet') or ''}"
+                for result in results for item in result["evidence"]
+            )
             prompt = f"""You are SiliconPulse, a semiconductor strategy analyst.
 {SYSTEM_INSTRUCTION_HIERARCHY}
-Compare these companies head-to-head using the counts and graph relationships in the data below. Output only JSON matching the report schema, with unique section IDs and required evidence, confidence, and ceo sections. Do not invent facts.
+Compare these companies head-to-head using the counts and graph relationships in the data below. Output only JSON matching the report schema, with unique section IDs and required evidence, confidence, and ceo sections. For each factual claim, cite source, timestamp, title and an exact verbatim span from retrieved evidence. Do not invent facts.
 USER CONTEXT: {body.query or 'recent signals'}
-{untrusted_block("COMPARISON_DATA", {"companies": companies, "per_company": lines, "graph_overlap": overlap_lines})}"""
+{untrusted_block("COMPARISON_DATA", {"companies": companies, "per_company": lines, "graph_overlap": overlap_lines})}
+{untrusted_block("RETRIEVED_EVIDENCE", evidence_context)}"""
             raw = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
-            comparison_report = validate_insight_report(raw).model_dump_json()
+            validated = validate_insight_report(raw)
+            validated, omitted_claims = ground_insight_report(validated, evidence_context)
+            if omitted_claims:
+                logger.info("Omitted %s comparison claims without verified evidence spans", omitted_claims)
+            comparison_report = validated.model_dump_json()
         except Exception as e:
             logger.warning(f"compare LLM failed: {e}")
             status = "fallback"

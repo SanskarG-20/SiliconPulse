@@ -115,6 +115,11 @@ async def graph_simulate(request: Request, body: SimulateRequest, user=Depends(g
 
             shock_pct = int(body.shock * 100)
             from ..models import InsightReport
+            from ..services.secure_prompt import ground_insight_report, untrusted_block
+            simulation_context = (
+                "[Simulation | SiliconPulse Graph Model] Scenario computation\n"
+                f"Snippet: {impact_text}"
+            )
             prompt = f"""
 You are SiliconPulse Scenario Engine. Simulate a supply-chain shock.
 
@@ -130,11 +135,19 @@ INSTRUCTIONS:
 - Quantify downstream $M impact using est_impact_usd_m
 - Suggest mitigations (dual-source, inventory, alternative fab)
 - Keep confidence Medium/Low due to simulation uncertainty
+- Every factual statement must cite source, timestamp, title, and an exact span copied from the simulation evidence below.
+{untrusted_block("SIMULATION_EVIDENCE", simulation_context)}
 """
             from ..services.secure_prompt import validate_insight_report
 
             raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
-            scenario_report = validate_insight_report(raw_report).model_dump_json()
+            validated = validate_insight_report(raw_report)
+            validated, omitted_claims = ground_insight_report(validated, simulation_context)
+            if omitted_claims:
+                import logging
+
+                logging.getLogger(__name__).info("Omitted %s scenario claims without verified spans", omitted_claims)
+            scenario_report = validated.model_dump_json()
         except Exception as e:
             import logging
 

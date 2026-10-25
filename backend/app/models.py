@@ -111,6 +111,7 @@ class ReportEvidence(BaseModel):
     source: str
     timestamp: str
     title: str
+    span: Optional[str] = Field(default=None, min_length=1, max_length=500, description="Exact supporting text copied from the cited evidence")
 
 class ReportSection(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)

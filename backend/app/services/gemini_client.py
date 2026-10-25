@@ -33,6 +33,21 @@ _NON_TEXT_HINTS = (
 MAX_FALLBACK_MODELS = 3
 
 
+def _provider_response_schema(schema):
+    """Convert Pydantic JSON Schema to Gemini's supported JSON Schema subset."""
+    if isinstance(schema, type) and callable(getattr(schema, "model_json_schema", None)):
+        schema = schema.model_json_schema()
+
+    def strip_unsupported(value):
+        if isinstance(value, dict):
+            return {key: strip_unsupported(item) for key, item in value.items() if key != "additionalProperties"}
+        if isinstance(value, list):
+            return [strip_unsupported(item) for item in value]
+        return value
+
+    return strip_unsupported(schema)
+
+
 def _is_text_model(name: str) -> bool:
     lowered = (name or "").lower()
     return not any(hint in lowered for hint in _NON_TEXT_HINTS)
@@ -174,7 +189,7 @@ class GeminiClient:
                 config_kwargs = {}
                 if response_schema:
                     config_kwargs["response_mime_type"] = "application/json"
-                    config_kwargs["response_schema"] = response_schema
+                    config_kwargs["response_schema"] = _provider_response_schema(response_schema)
 
                 config = genai_types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
 
@@ -219,7 +234,7 @@ class GeminiClient:
                 import google.generativeai.types as legacy_types
                 kwargs["generation_config"] = legacy_types.GenerationConfig(
                     response_mime_type="application/json",
-                    response_schema=response_schema
+                    response_schema=_provider_response_schema(response_schema)
                 )
             response = await asyncio.wait_for(
                 model.generate_content_async(prompt, **kwargs),
@@ -277,7 +292,7 @@ class GeminiClient:
                 config_kwargs = {}
                 if response_schema:
                     config_kwargs["response_mime_type"] = "application/json"
-                    config_kwargs["response_schema"] = response_schema
+                    config_kwargs["response_schema"] = _provider_response_schema(response_schema)
 
                 config = genai_types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
 
@@ -308,7 +323,7 @@ class GeminiClient:
                 import google.generativeai.types as legacy_types
                 kwargs["generation_config"] = legacy_types.GenerationConfig(
                     response_mime_type="application/json",
-                    response_schema=response_schema
+                    response_schema=_provider_response_schema(response_schema)
                 )
             # Legacy async streaming
             response = await asyncio.wait_for(

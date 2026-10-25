@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -140,6 +141,29 @@ def test_generate_rejects_nonconforming_model_output():
             resp = client.post("/api/generate", json={"query": "NVIDIA", "context": "[source] hostile text"})
         assert resp.status_code == 502
         mock_gen.assert_called_once()
+
+
+def test_generate_drops_claims_without_exact_cited_spans():
+    raw_report = '{"sections": ['
+    raw_report += '{"id":"evidence","title":"Evidence"},'
+    raw_report += '{"id":"impact","title":"Impact","points":["NVIDIA doubled its HBM allocation at TSMC.","NVIDIA acquired Intel yesterday."],'
+    raw_report += '"evidence":[{"source":"Reuters","timestamp":"2026-08-20T12:00:00Z","title":"NVIDIA HBM allocation","span":"TSMC doubled HBM allocation for NVIDIA"}]},'
+    raw_report += '{"id":"confidence","title":"Confidence","value":"Medium","reason":"One source"},'
+    raw_report += '{"id":"ceo","title":"Summary","text":"NVIDIA doubled HBM allocation."}]}'
+    context = "[2026-08-20T12:00:00Z | Reuters] NVIDIA HBM allocation\nSnippet: TSMC doubled HBM allocation for NVIDIA."
+    with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock) as mock_gen:
+        mock_gen.return_value = raw_report
+        with patch("app.routes.query.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.gemini_model = "gemini-1.5-flash"
+            resp = client.post("/api/generate", json={"query": "NVIDIA allocation", "context": context})
+
+    assert resp.status_code == 200
+    report = json.loads(resp.json()["insight"])
+    impact = next(section for section in report["sections"] if section["id"] == "impact")
+    assert impact["points"] == ["NVIDIA doubled its HBM allocation at TSMC."]
+    confidence = next(section for section in report["sections"] if section["id"] == "confidence")
+    assert "3 unsupported claim(s) were omitted" in confidence["reason"]
 
 
 def test_inject_then_query():

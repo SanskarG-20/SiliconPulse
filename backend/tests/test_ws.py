@@ -1,6 +1,5 @@
 """
-WebSocket tests for /api/ws/signals.
-Uses FastAPI TestClient websocket_connect. Auth is mocked by patching _verify_ws_token.
+WebSocket tests for single-use tickets on /api/ws/signals.
 """
 import json
 from unittest.mock import patch
@@ -15,16 +14,16 @@ from app.settings import settings
 client = TestClient(app)
 
 
-def test_ws_rejects_without_token():
+def test_ws_rejects_without_ticket():
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect("/api/ws/signals") as ws:
             ws.receive_json()
 
 
-def test_ws_rejects_bad_token():
-    with patch("app.ws._verify_ws_token", return_value=None):
+def test_ws_rejects_jwt_query_token():
+    with patch("app.storage.consume_websocket_ticket", return_value=None):
         with pytest.raises(WebSocketDisconnect):
-            with client.websocket_connect("/api/ws/signals?token=bad") as ws:
+            with client.websocket_connect("/api/ws/signals?token=jwt-secret") as ws:
                 ws.receive_json()
 
 
@@ -41,13 +40,13 @@ def test_ws_sends_signals_and_pong(tmp_path):
 
     with patch("app.ws.safe_read_jsonl", return_value=events), \
          patch("app.ws.settings") as mock_settings, \
-         patch("app.ws._verify_ws_token", return_value="user_ws_test"):
+         patch("app.storage.consume_websocket_ticket", return_value="user_ws_test"):
         mock_settings.resolved_data_path = data_path
         mock_settings.freshness_hours = 12
         mock_settings.clerk_issuer = settings.clerk_issuer
         mock_settings.clerk_audience = settings.clerk_audience
 
-        with client.websocket_connect("/api/ws/signals?token=good") as ws:
+        with client.websocket_connect("/api/ws/signals?ticket=single-use-ticket") as ws:
             # First message: initial signals push
             msg = ws.receive_json()
             assert msg["type"] == "signals"

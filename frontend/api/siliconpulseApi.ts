@@ -51,6 +51,17 @@ const apiFetch = async (path: string, init: RequestInit = {}, timeoutMs = DEFAUL
     }), controller, timeoutMs);
 };
 
+export const createSignalsWsTicket = async (): Promise<string | null> => {
+    try {
+        const response = await apiFetch('/auth/ws-ticket', { method: 'POST' });
+        if (!response.ok) return null;
+        const data = await parseJsonSafely(response, { ticket: '' });
+        return typeof (data as any)?.ticket === 'string' ? (data as any).ticket : null;
+    } catch {
+        return null;
+    }
+};
+
 const parseJsonSafely = async <T>(response: Response, fallback: T): Promise<T> => {
     try {
         return await response.json();

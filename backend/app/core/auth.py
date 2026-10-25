@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 from typing import Optional
@@ -13,15 +15,14 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _api_key_from_request(request: Optional[Request]) -> Optional[str]:
-    """Extract raw API key from X-API-Key header or ?api_key= (bots/CI)."""
+    """Extract raw API key from the X-API-Key header (bots/CI)."""
     if request is None:
         return None
     try:
         header_key = request.headers.get("x-api-key", "").strip()
         if header_key:
             return header_key
-        query_key = request.query_params.get("api_key", "").strip()
-        return query_key or None
+        return None
     except Exception:
         return None
 
@@ -64,7 +65,7 @@ def get_current_user(
 ):
     """Validate Clerk bearer token (or SiliconPulse API key fallback) and return identity payload."""
     if credentials is None:
-        # Bots/CI path: X-API-Key header or ?api_key=
+        # Bots/CI path: API keys are header-only to keep them out of URLs and logs.
         raw_key = _api_key_from_request(request)
         if raw_key:
             identity = _verify_api_key(raw_key)
@@ -132,3 +133,21 @@ def get_current_user(
         "session_id": payload.get("sid"),
         "claims": payload,
     }
+
+
+def require_privileged_role(user: dict, required_role: str | None = None) -> None:
+    """Fail closed unless the verified identity carries the configured admin role."""
+    role_name = (required_role or settings.privileged_inject_role or "admin").strip().lower()
+    claims = user.get("claims") if isinstance(user, dict) else None
+    if not isinstance(claims, dict):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privileged role required")
+    metadata = claims.get("public_metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    roles = claims.get("roles")
+    if isinstance(roles, str):
+        roles = [roles]
+    if not isinstance(roles, list):
+        roles = []
+    candidates = [claims.get("role"), metadata.get("role"), *roles]
+    if not any(isinstance(role, str) and role.strip().lower() == role_name for role in candidates):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privileged role required")

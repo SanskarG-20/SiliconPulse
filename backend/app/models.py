@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QueryRequest(BaseModel):
@@ -107,12 +107,14 @@ class SourceVerifyResponse(BaseModel):
 
 
 class ReportEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
     source: str
     timestamp: str
     title: str
 
 class ReportSection(BaseModel):
-    id: str = Field(description="Section ID like 'evidence', 'change', 'impact', 'competitors', 'outlook', 'confidence', 'ceo'")
+    model_config = ConfigDict(extra="forbid", strict=True)
+    id: Literal["evidence", "change", "impact", "competitors", "outlook", "confidence", "ceo"]
     title: str = Field(description="Display title for the section")
     points: Optional[list[str]] = Field(default=None, description="Bullet points for the section")
     text: Optional[str] = Field(default=None, description="Paragraph text (used mainly for 'ceo' section)")
@@ -121,5 +123,6 @@ class ReportSection(BaseModel):
     evidence: Optional[list[ReportEvidence]] = Field(default=None, description="List of evidence items")
 
 class InsightReport(BaseModel):
-    sections: list[ReportSection]
+    model_config = ConfigDict(extra="forbid", strict=True)
+    sections: list[ReportSection] = Field(min_length=1, max_length=7)
 

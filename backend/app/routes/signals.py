@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..core.auth import get_current_user
+from ..core.auth import get_current_user, require_privileged_role
 from ..core.limiter import limiter
 from ..models import InjectRequest, InjectResponse
 from ..settings import settings
@@ -47,6 +47,7 @@ async def inject_signal(request: Request, body: InjectRequest, user=Depends(get_
     - Checks for duplicates using event fingerprint
     - Appends as JSON line to DATA_STREAM_PATH if unique
     """
+    require_privileged_role(user)
     try:
         if body.timestamp is None:
             injected_at = datetime.now().isoformat()

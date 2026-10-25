@@ -5,13 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..core.auth import get_current_user
+from ..core.tenant import TenantAccess, get_tenant_access, require_public_brief
 from ..core.limiter import limiter
 from ..supabase_client import (
     create_brief,
     ensure_user,
-    get_brief,
     is_supabase_enabled,
-    is_workspace_member,
     list_briefs,
 )
 
@@ -30,7 +29,7 @@ class BriefShareRequest(BaseModel):
 
 @router.post("/briefs/share")
 @limiter.limit("15/minute")
-async def share_brief(request: Request, body: BriefShareRequest, user=Depends(get_current_user)):
+async def share_brief(request: Request, body: BriefShareRequest, user=Depends(get_current_user), access: TenantAccess = Depends(get_tenant_access)):
     user_id = user.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -38,8 +37,8 @@ async def share_brief(request: Request, body: BriefShareRequest, user=Depends(ge
         raise HTTPException(status_code=503, detail="Sharing unavailable (persistence not configured)")
     ensure_user(user_id, user.get("email"))
     workspace_id = (body.workspace_id or "").strip() or None
-    if workspace_id and not is_workspace_member(user_id, workspace_id):
-        raise HTTPException(status_code=403, detail="Not a workspace member")
+    if workspace_id:
+        access.require_workspace(workspace_id)
     brief_id = create_brief(user_id, body.query, body.insight, body.evidence, workspace_id=workspace_id)
     if not brief_id:
         raise HTTPException(status_code=500, detail="Failed to create brief")
@@ -56,11 +55,7 @@ async def my_briefs(limit: int = 10, user=Depends(get_current_user)):
 
 @router.get("/briefs/public/{brief_id}")
 async def public_brief(brief_id: str):
-    brief = get_brief(brief_id)
-    if not brief:
-        raise HTTPException(status_code=404, detail="Brief not found")
-    if not brief.get("is_public", True):
-        raise HTTPException(status_code=403, detail="Brief is private")
+    brief = require_public_brief(brief_id)
     return {
         "id": brief.get("id", brief_id),
         "query": brief.get("query_text", ""),

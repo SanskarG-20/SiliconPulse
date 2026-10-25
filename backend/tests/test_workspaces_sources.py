@@ -40,12 +40,12 @@ def test_workspaces_join_invalid_code():
 
 
 def test_workspaces_forbidden_for_non_member():
-    with patch("app.routes.workspaces.is_workspace_member", return_value=False):
+    with patch("app.core.tenant.is_workspace_member", return_value=False):
         assert client.get("/api/workspaces/w1").status_code == 403
 
 
 def test_workspaces_detail_and_watchlist():
-    with patch("app.routes.workspaces.is_workspace_member", return_value=True), patch(
+    with patch("app.core.tenant.is_workspace_member", return_value=True), patch(
         "app.routes.workspaces.list_workspace_members", return_value=[{"user_id": "test_user", "role": "owner"}]
     ), patch("app.routes.workspaces.list_workspace_watchlist", return_value=["TSMC"]), patch(
         "app.routes.workspaces.list_workspace_briefs", return_value=[]

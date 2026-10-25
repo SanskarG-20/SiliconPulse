@@ -11,6 +11,8 @@ from ..core.limiter import limiter
 from ..graph.store import get_impact, get_suppliers
 from ..retrieval import retrieve_evidence
 from ..services.gemini_client import gemini_client
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, untrusted_block, validate_insight_report
+from ..models import InsightReport
 from ..settings import settings
 from ..supabase_client import ensure_user
 from ..utils import compute_confidence, extract_companies
@@ -157,32 +159,18 @@ async def compare_companies(request: Request, body: CompareRequest, user=Depends
             overlap_lines = []
             for o in overlap["shared_downstream"][:4]:
                 overlap_lines.append(f"shared downstream {o['company']} via {', '.join(o['shared_by'])}")
-            prompt = f"""You are SiliconPulse, a semiconductor strategy analyst. Compare these companies head-to-head.
-
-COMPANIES: {', '.join(companies)}
-CONTEXT: {body.query or 'recent signals'}
-PER-COMPANY:
-{chr(10).join(lines)}
-GRAPH OVERLAP:
-{chr(10).join(overlap_lines) or 'none shared'}
-INSTRUCTIONS:
-- Output strictly valid JSON, no markdown fences.
-- Declare a leader and laggard with one-line reasons grounded ONLY in the counts above.
-- Call out shared supply-chain exposure explicitly.
-- Keep confidence Low/Medium unless evidence is strong.
-JSON SCHEMA: {{"sections": [{{"id":"evidence","title":"Head-to-Head Evidence","points":["..."]}},{{"id":"change","title":"What Changed","points":["..."]}},{{"id":"impact","title":"Impact Reasoning","points":["..."]}},{{"id":"competitors","title":"Competitor Effects","points":["..."]}},{{"id":"outlook","title":"Strategic Outlook","points":["..."]}},{{"id":"confidence","title":"Confidence Meter","value":"Low|Medium|High","reason":"..."}},{{"id":"ceo","title":"CEO Summary","text":"..."}}]}}"""
-            raw = await gemini_client.generate_content_with_fallback(prompt)
-            raw = raw.strip()
-            if raw.startswith("```json"):
-                raw = raw[7:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            comparison_report = json.dumps(json.loads(raw.strip()))
+            prompt = f"""You are SiliconPulse, a semiconductor strategy analyst.
+{SYSTEM_INSTRUCTION_HIERARCHY}
+Compare these companies head-to-head using the counts and graph relationships in the data below. Output only JSON matching the report schema, with unique section IDs and required evidence, confidence, and ceo sections. Do not invent facts.
+USER CONTEXT: {body.query or 'recent signals'}
+{untrusted_block("COMPARISON_DATA", {"companies": companies, "per_company": lines, "graph_overlap": overlap_lines})}"""
+            raw = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+            comparison_report = validate_insight_report(raw).model_dump_json()
         except Exception as e:
             logger.warning(f"compare LLM failed: {e}")
             status = "fallback"
             comparison_report = json.dumps(
-                {"sections": [{"id": "evidence", "title": "Comparison Evidence", "points": [f"{r['company']}: {r['evidence_count']} signals" for r in results]}, {"id": "ceo", "title": "CEO Summary", "text": "LLM synthesis unavailable; table above reflects retrieval counts."}]}
+                {"sections": [{"id": "evidence", "title": "Comparison Evidence", "points": [f"{r['company']}: {r['evidence_count']} signals" for r in results]}, {"id": "confidence", "title": "Confidence Meter", "value": "Low", "reason": "LLM synthesis unavailable; counts are retrieval snapshots."}, {"id": "ceo", "title": "CEO Summary", "text": "LLM synthesis unavailable; table above reflects retrieval counts."}]}
             )
 
     return {

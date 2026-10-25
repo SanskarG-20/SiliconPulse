@@ -5,6 +5,7 @@ import logging
 import math
 from collections import Counter
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 
 from app.services.digest_service import send_slack
 from app.settings import settings
@@ -18,8 +19,21 @@ ALLOWED_EVENTS = {"spike.alert", "digest"}
 def validate_webhook_url(url: str) -> str:
     """Allow only Slack/Discord incoming webhooks. Returns cleaned URL or ''."""
     url = (url or "").strip()
-    if url.startswith(("https://hooks.slack.com/", "https://discord.com/api/")):
-        return url[:500]
+    try:
+        parts = urlsplit(url)
+        if (
+            parts.scheme == "https"
+            and parts.username is None
+            and parts.password is None
+            and parts.port in (None, 443)
+            and (
+                (parts.hostname == "hooks.slack.com" and parts.path.startswith("/services/"))
+                or (parts.hostname == "discord.com" and parts.path.startswith("/api/webhooks/"))
+            )
+        ):
+            return url[:500]
+    except ValueError:
+        pass
     return ""
 
 

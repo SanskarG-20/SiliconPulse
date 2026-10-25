@@ -3,9 +3,8 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 
-import httpx
-
 from ..settings import settings
+from ..services.safe_fetch import safe_fetch_sync
 from ..supabase_client import list_enabled_rss_feeds, touch_rss_feed
 from ..utils import (
     classify_event_type,
@@ -82,10 +81,8 @@ def pull_rss_feeds() -> dict:
             continue
         checked += 1
         try:
-            with httpx.Client(timeout=15, follow_redirects=True, headers={"User-Agent": "SiliconPulse/1.0"}) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-            raw_items = parse_feed_xml(resp.text[:500000])
+            feed_bytes = safe_fetch_sync(url)
+            raw_items = parse_feed_xml(feed_bytes.decode("utf-8", errors="replace"))
             events = []
             for it in raw_items:
                 title = sanitize_title(it.get("title", ""))

@@ -49,7 +49,7 @@ async def create_key(request: Request, body: KeyCreateRequest, user=Depends(get_
         "name": row.get("name"),
         "key": raw_key,
         "prefix": raw_key[:14],
-        "warning": "Store this key now — it is never shown again. Send as X-API-Key header or ?api_key=.",
+        "warning": "Store this key now — it is never shown again. Send it in the X-API-Key header.",
     }
 
 

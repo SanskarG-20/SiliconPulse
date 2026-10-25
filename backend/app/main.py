@@ -2,12 +2,13 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from .core.auth import get_current_user
 from .core.limiter import limiter
 from .routes import router
 from .scheduler import start_scheduler, stop_scheduler
@@ -182,7 +183,7 @@ async def ping():
     return {"ok": True, "t": int(time.time())}
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(get_current_user)])
 async def metrics():
     uptime = int(time.time() - START_TIME)
     # Stream stats

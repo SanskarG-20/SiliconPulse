@@ -57,7 +57,7 @@ def test_brief_share_and_public_read():
     with patch("app.routes.briefs.ensure_user", return_value=True), patch(
         "app.routes.briefs.is_supabase_enabled", return_value=True
     ), patch("app.routes.briefs.create_brief", return_value="brief-1"), patch(
-        "app.routes.briefs.get_brief",
+        "app.core.tenant.get_brief",
         return_value={"id": "brief-1", "query_text": "TSMC?", "insight": "insight", "evidence": [], "is_public": True, "created_at": "2026-01-01"},
     ):
         resp = client.post("/api/briefs/share", json={"query": "TSMC?", "insight": "insight body", "evidence": []})

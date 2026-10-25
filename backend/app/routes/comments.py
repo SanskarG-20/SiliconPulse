@@ -1,16 +1,19 @@
 """Brief annotations (Phase 3.1). Public read on public briefs; auth to post/delete own."""
 import logging
+import html
+import re
+import unicodedata
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..core.auth import get_current_user
 from ..core.limiter import limiter
+from ..core.tenant import require_public_brief
 from ..supabase_client import (
     add_brief_comment,
     delete_brief_comment,
     ensure_user,
-    get_brief,
     is_supabase_enabled,
     list_brief_comments,
 )
@@ -21,33 +24,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _require_public_brief(brief_id: str) -> dict:
-    brief = get_brief(brief_id)
-    if not brief:
-        raise HTTPException(status_code=404, detail="Brief not found")
-    if not brief.get("is_public", True):
-        raise HTTPException(status_code=403, detail="Brief is private")
-    return brief
-
-
 class CommentPost(BaseModel):
     body: str = Field(..., min_length=1, max_length=2000)
 
 
 @router.get("/briefs/public/{brief_id}/comments")
-async def get_comments(brief_id: str, limit: int = 50):
-    _require_public_brief(brief_id)
+@limiter.limit("60/minute")
+async def get_comments(request: Request, brief_id: str, limit: int = 50):
+    require_public_brief(brief_id)
     return {"comments": list_brief_comments(brief_id, limit=limit)}
 
 
 @router.post("/briefs/{brief_id}/comments")
-@limiter.limit("20/minute")
+@limiter.limit("10/minute")
 async def post_comment(request: Request, brief_id: str, body: CommentPost, user=Depends(get_current_user)):
     user_id = user.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    _require_public_brief(brief_id)
-    text = (body.body or "").strip()
+    require_public_brief(brief_id)
+    text = unicodedata.normalize("NFKC", html.unescape(body.body or ""))
+    text = re.sub(r"<[^>]*>", " ", text)
+    text = "".join(ch for ch in text if ch in "\n\t" or not unicodedata.category(ch).startswith("C"))
+    text = re.sub(r"[ \t]+", " ", text).strip()
     if not text:
         raise HTTPException(status_code=400, detail="Comment body required")
     ensure_user(user_id, user.get("email"))

@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..company_dict import COMPANY_DICT
 from ..core.auth import get_current_user
@@ -21,6 +21,7 @@ from ..models import (
 from ..query_cache import query_cache
 from ..services.embedding_service import embed_text
 from ..services.gemini_client import gemini_client
+from ..services.secure_prompt import SYSTEM_INSTRUCTION_HIERARCHY, untrusted_block, validate_insight_report
 from ..services.vector_store import is_available as vector_available
 from ..services.vector_store import query_similar
 from ..settings import settings
@@ -316,7 +317,11 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
         user_email = user.get("email")
 
         if not settings.gemini_api_key:
-            fallback_text = "**Simulation Mode**\n\nGemini API Key is missing. Please configure `GEMINI_API_KEY` in `.env` for live AI insights.\n\nBased on the available signals, market activity appears elevated with significant movement in the semiconductor sector."
+            fallback_text = json.dumps({"sections": [
+                {"id": "evidence", "title": "Simulation Mode", "points": ["Gemini is not configured; no generated claims are available."]},
+                {"id": "confidence", "title": "Confidence Meter", "value": "Low", "reason": "No model-generated analysis is available."},
+                {"id": "ceo", "title": "CEO Summary", "text": "Configure Gemini to generate a report from current evidence."},
+            ]})
             if user_id:
                 ensure_user(user_id, user_email)
                 insert_insight_record(
@@ -426,48 +431,38 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
 
         from ..models import InsightReport
         
-        prompt = f"""
-        You are SiliconPulse, an advanced strategic intelligence engine.
-        Generate a high-precision intelligence report based on the provided context.
+        prompt = f"""You are SiliconPulse, an evidence-based semiconductor and AI supply-chain analyst.
+{SYSTEM_INSTRUCTION_HIERARCHY}
 
-        QUERY: {body.query}
+Analyze the user's query using the evidence and graph facts below. Output only one JSON object matching the supplied schema, with no markdown fences or extra fields. The sections array must contain unique section IDs and include evidence, confidence, and ceo.
 
-        CONTEXT:
-        {body.context}
+USER QUERY: {body.query}
 
-        GRAPH CONTEXT (supply-chain relationships):
-        {graph_context}
+{untrusted_block("RETRIEVED_EVIDENCE", body.context)}
 
-        INSTRUCTIONS:
-        - Analyze the provided evidence carefully.
-        - IMPORTANT: Even if there is only ONE evidence item, extract all possible facts and implications.
-        - If evidence is low, focus on "What we know" vs "What we don't know".
-        - Include uncertainties and monitoring suggestions in the "outlook" section.
-        - Ensure the "confidence" section reflects the limited data (e.g., "Low" or "Medium").
-        - For the "ceo" section, use the "text" field to provide a paragraph summary.
-        - For other sections (like "evidence", "change", "impact", "competitors", "outlook"), provide a list of "points".
-        """
+{untrusted_block("GRAPH_CONTEXT", graph_context)}
+"""
 
-        from fastapi.responses import StreamingResponse
-        
-        async def stream_generator():
-            full_text = ""
-            async for chunk in gemini_client.generate_content_stream_with_fallback(prompt, response_schema=InsightReport):
-                full_text += chunk
-                yield chunk
-                
-            if user_id:
-                ensure_user(user_id, user_email)
-                insert_insight_record(
-                    user_id=user_id,
-                    query_text=body.query,
-                    insight=full_text,
-                    model_name=settings.gemini_model,
-                    status="success",
-                )
+        raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+        try:
+            validated_report = validate_insight_report(raw_report)
+        except ValueError as exc:
+            logger.warning("Gemini returned a nonconforming report for query %s", body.query[:80])
+            raise HTTPException(status_code=502, detail="Report generation returned invalid structured output") from exc
+        full_text = validated_report.model_dump_json()
+        if user_id:
+            ensure_user(user_id, user_email)
+            insert_insight_record(
+                user_id=user_id,
+                query_text=body.query,
+                insight=full_text,
+                model_name=settings.gemini_model,
+                status="success",
+            )
+        return GenerateResponse(insight=full_text)
 
-        return StreamingResponse(stream_generator(), media_type="text/plain")
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Gemini Generation Failed: {e}")
         failed_text = f"**Insight Generation Unavailable**\n\nWe encountered an issue connecting to the intelligence engine. However, the live data above remains accurate.\n\n*System Note: {str(e)}*"
@@ -482,4 +477,4 @@ async def generate_insight(request: Request, body: GenerateRequest, user=Depends
                 model_name=settings.gemini_model,
                 status="failed",
             )
-        return GenerateResponse(insight=failed_text)
+        raise HTTPException(status_code=502, detail="Report generation is unavailable") from e

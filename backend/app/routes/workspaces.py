@@ -6,12 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..core.auth import get_current_user
+from ..core.tenant import TenantAccess, get_tenant_access
 from ..supabase_client import (
     add_workspace_company,
     create_workspace,
     ensure_user,
     is_supabase_enabled,
-    is_workspace_member,
     join_workspace,
     leave_workspace,
     list_workspace_briefs,
@@ -41,11 +41,6 @@ class WorkspaceCompanyAdd(BaseModel):
 def _require_supabase():
     if not is_supabase_enabled():
         raise HTTPException(status_code=503, detail="Workspaces unavailable (persistence not configured)")
-
-
-def _require_member(user_id: str, workspace_id: str):
-    if not is_workspace_member(user_id, workspace_id):
-        raise HTTPException(status_code=403, detail="Not a workspace member")
 
 
 @router.get("/workspaces")
@@ -82,9 +77,8 @@ async def join_ws(body: WorkspaceJoin, user=Depends(get_current_user)):
 
 
 @router.get("/workspaces/{workspace_id}")
-async def workspace_detail(workspace_id: str, user=Depends(get_current_user)):
-    user_id = user.get("user_id", "")
-    _require_member(user_id, workspace_id)
+async def workspace_detail(workspace_id: str, user=Depends(get_current_user), access: TenantAccess = Depends(get_tenant_access)):
+    access.require_workspace(workspace_id)
     return {
         "members": list_workspace_members(workspace_id),
         "watchlist": list_workspace_watchlist(workspace_id),
@@ -93,22 +87,22 @@ async def workspace_detail(workspace_id: str, user=Depends(get_current_user)):
 
 
 @router.post("/workspaces/{workspace_id}/watchlist")
-async def workspace_watch_add(workspace_id: str, body: WorkspaceCompanyAdd, user=Depends(get_current_user)):
-    user_id = user.get("user_id", "")
-    _require_member(user_id, workspace_id)
+async def workspace_watch_add(workspace_id: str, body: WorkspaceCompanyAdd, user=Depends(get_current_user), access: TenantAccess = Depends(get_tenant_access)):
+    user_id = access.user_id
+    access.require_workspace(workspace_id)
     add_workspace_company(workspace_id, body.company.strip(), added_by=user_id)
     return {"watchlist": list_workspace_watchlist(workspace_id)}
 
 
 @router.delete("/workspaces/{workspace_id}/watchlist/{company}")
-async def workspace_watch_remove(workspace_id: str, company: str, user=Depends(get_current_user)):
-    user_id = user.get("user_id", "")
-    _require_member(user_id, workspace_id)
+async def workspace_watch_remove(workspace_id: str, company: str, user=Depends(get_current_user), access: TenantAccess = Depends(get_tenant_access)):
+    access.require_workspace(workspace_id)
     remove_workspace_company(workspace_id, company)
     return {"watchlist": list_workspace_watchlist(workspace_id)}
 
 
 @router.post("/workspaces/{workspace_id}/leave")
-async def workspace_leave(workspace_id: str, user=Depends(get_current_user)):
-    leave_workspace(user.get("user_id", ""), workspace_id)
+async def workspace_leave(workspace_id: str, access: TenantAccess = Depends(get_tenant_access)):
+    access.require_workspace(workspace_id)
+    leave_workspace(access.user_id, workspace_id)
     return {"left": workspace_id}

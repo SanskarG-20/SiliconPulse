@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..cache import event_cache
 from ..core.auth import get_current_user
@@ -8,6 +8,8 @@ from ..demo_generator import DemoGenerator
 from ..settings import settings
 from ..supabase_client import ensure_user
 from ..utils import deduplicate_and_append
+from ..core.limiter import limiter
+from ..storage import create_websocket_ticket
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
@@ -31,6 +33,16 @@ async def auth_me(user=Depends(get_current_user)):
         "email": user_email,
         "session_id": user.get("session_id"),
     }
+
+
+@router.post("/ws-ticket")
+@limiter.limit("30/minute")
+async def issue_ws_ticket(request: Request, user=Depends(get_current_user)):
+    """Issue a short-lived, single-use credential for the browser WebSocket."""
+    user_id = user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"ticket": create_websocket_ticket(user_id, ttl_seconds=60), "expires_in": 60}
 
 
 @router.post("/bootstrap")

@@ -13,7 +13,7 @@ PUBLIC_BRIEF = {"id": "b1", "query_text": "TSMC?", "insight": "i", "evidence": [
 
 
 def test_comments_thread_public():
-    with patch("app.routes.comments.get_brief", return_value=PUBLIC_BRIEF), patch(
+    with patch("app.core.tenant.get_brief", return_value=PUBLIC_BRIEF), patch(
         "app.routes.comments.list_brief_comments", return_value=[{"id": "c1", "user_id": "u1", "body": "Agreed", "created_at": "2026-01-02"}]
     ):
         resp = client.get("/api/briefs/public/b1/comments")
@@ -22,18 +22,18 @@ def test_comments_thread_public():
 
 
 def test_comments_thread_404_for_missing_brief():
-    with patch("app.routes.comments.get_brief", return_value=None):
+    with patch("app.core.tenant.get_brief", return_value=None):
         assert client.get("/api/briefs/public/nope/comments").status_code == 404
 
 
 def test_comments_thread_403_for_private_brief():
-    with patch("app.routes.comments.get_brief", return_value={**PUBLIC_BRIEF, "is_public": False}):
+    with patch("app.core.tenant.get_brief", return_value={**PUBLIC_BRIEF, "is_public": False}):
         assert client.get("/api/briefs/public/b1/comments").status_code == 403
 
 
 def test_post_comment():
     row = {"id": "c2", "body": "Check CoWoS capacity", "created_at": "2026-01-03"}
-    with patch("app.routes.comments.get_brief", return_value=PUBLIC_BRIEF), patch(
+    with patch("app.core.tenant.get_brief", return_value=PUBLIC_BRIEF), patch(
         "app.routes.comments.ensure_user", return_value=True
     ), patch("app.routes.comments.add_brief_comment", return_value=row):
         resp = client.post("/api/briefs/b1/comments", json={"body": "Check CoWoS capacity"})
@@ -42,12 +42,12 @@ def test_post_comment():
 
 
 def test_post_comment_rejects_empty():
-    with patch("app.routes.comments.get_brief", return_value=PUBLIC_BRIEF):
+    with patch("app.core.tenant.get_brief", return_value=PUBLIC_BRIEF):
         assert client.post("/api/briefs/b1/comments", json={"body": "   "}).status_code in (400, 422)
 
 
 def test_post_comment_unavailable_without_supabase():
-    with patch("app.routes.comments.get_brief", return_value=PUBLIC_BRIEF), patch(
+    with patch("app.core.tenant.get_brief", return_value=PUBLIC_BRIEF), patch(
         "app.routes.comments.ensure_user", return_value=True
     ), patch("app.routes.comments.add_brief_comment", return_value=None), patch(
         "app.routes.comments.is_supabase_enabled", return_value=False

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createSignalsWsTicket } from '../api/siliconpulseApi';
 
 export type WSStatus = 'connecting' | 'open' | 'closed' | 'error';
 
@@ -20,7 +21,7 @@ interface UseSignalsWSOptions {
 
 /**
  * Live WebSocket feed for signals.
- * - Connects to {baseUrl}/ws/signals?token=<jwt>
+ * - Fetches a short-lived single-use ticket, then connects with that ticket.
  * - Auto-reconnects with exponential backoff (2s -> 16s, max 5 tries per burst)
  * - Sends ping every 30s to keep alive
  * - Reports status so UI can fall back to SWR polling when closed/error
@@ -42,11 +43,11 @@ export const useSignalsWS = ({
   const onStatusRef = useRef(onStatusChange);
   onStatusRef.current = onStatusChange;
 
-  const wsUrl = useCallback(() => {
+  const wsUrl = useCallback((ticket: string) => {
     const base = (baseUrl || (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
     const wsBase = base.replace(/^http/, 'ws');
-    return `${wsBase}/ws/signals${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-  }, [baseUrl, token]);
+    return `${wsBase}/ws/signals?ticket=${encodeURIComponent(ticket)}`;
+  }, [baseUrl]);
 
   const clearTimers = () => {
     if (pingTimerRef.current) { window.clearInterval(pingTimerRef.current); pingTimerRef.current = null; }
@@ -62,12 +63,16 @@ export const useSignalsWS = ({
 
     let cancelled = false;
 
-    const connect = () => {
+    let connectWithRetry: () => void;
+    const connect = async () => {
       if (cancelled) return;
       try { wsRef.current?.close(); } catch {}
       setStatus('connecting');
       onStatusRef.current?.('connecting');
-      const ws = new WebSocket(wsUrl());
+      const ticket = await createSignalsWsTicket();
+      if (cancelled) return;
+      if (!ticket) throw new Error('Could not issue WebSocket ticket');
+      const ws = new WebSocket(wsUrl(ticket));
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -104,7 +109,7 @@ export const useSignalsWS = ({
         if (retryRef.current < 5) {
           const delay = Math.min(2000 * Math.pow(2, retryRef.current), 16000);
           retryRef.current += 1;
-          reconnectTimerRef.current = window.setTimeout(connect, delay);
+          reconnectTimerRef.current = window.setTimeout(connectWithRetry, delay);
         }
       };
 
@@ -114,7 +119,19 @@ export const useSignalsWS = ({
       };
     };
 
-    connect();
+    connectWithRetry = () => {
+      connect().catch(() => {
+        if (cancelled) return;
+        setStatus('error');
+        onStatusRef.current?.('error');
+        if (retryRef.current < 5) {
+          const delay = Math.min(2000 * Math.pow(2, retryRef.current), 16000);
+          retryRef.current += 1;
+          reconnectTimerRef.current = window.setTimeout(connectWithRetry, delay);
+        }
+      });
+    };
+    connectWithRetry();
 
     return () => {
       cancelled = true;

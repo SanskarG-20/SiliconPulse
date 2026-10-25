@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "SiliconPulse API"
     clerk_issuer: str = ""
     clerk_audience: str = ""
+    privileged_inject_role: str = "admin"
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     supabase_anon_key: str = ""  # optional, enables per-user RLS via anon + JWT

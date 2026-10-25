@@ -5,9 +5,11 @@ Handles SQLite database connections, deduplication persistence, and source check
 from __future__ import annotations
 
 import logging
+import hashlib
+import secrets
 import sqlite3
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .settings import settings
@@ -53,12 +55,65 @@ def init_db():
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS websocket_tickets (
+                ticket_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                expires_at INTEGER NOT NULL
+            )
+        """)
+
         conn.commit()
         logger.info(f"Database initialized at {settings.db_path}")
 
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         # Don't raise, just log - we'll handle connection errors gracefully in other functions
+
+
+def create_websocket_ticket(user_id: str, ttl_seconds: int = 60) -> str:
+    """Create an opaque short-lived ticket; only its hash is stored."""
+    if not user_id:
+        raise ValueError("user_id is required")
+    ticket = secrets.token_urlsafe(32)
+    ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
+    expires_at = int(datetime.now(timezone.utc).timestamp()) + max(1, min(ttl_seconds, 120))
+    conn = get_db_connection()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS websocket_tickets (ticket_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
+    )
+    conn.execute("DELETE FROM websocket_tickets WHERE expires_at <= ?", (int(datetime.now(timezone.utc).timestamp()),))
+    conn.execute(
+        "INSERT INTO websocket_tickets (ticket_hash, user_id, expires_at) VALUES (?, ?, ?)",
+        (ticket_hash, user_id, expires_at),
+    )
+    conn.commit()
+    return ticket
+
+
+def consume_websocket_ticket(ticket: str) -> str | None:
+    """Atomically redeem one ticket exactly once; delete expired tickets too."""
+    if not ticket or len(ticket) > 200:
+        return None
+    ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
+    conn = get_db_connection()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS websocket_tickets (ticket_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
+    )
+    now = int(datetime.now(timezone.utc).timestamp())
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT user_id, expires_at FROM websocket_tickets WHERE ticket_hash = ?", (ticket_hash,)
+        ).fetchone()
+        conn.execute("DELETE FROM websocket_tickets WHERE ticket_hash = ?", (ticket_hash,))
+        conn.commit()
+        if row and row["expires_at"] > now:
+            return str(row["user_id"])
+        return None
+    except Exception:
+        conn.rollback()
+        raise
 
 def is_duplicate(event_id: str) -> bool:
     """Check if an event_id has already been seen"""

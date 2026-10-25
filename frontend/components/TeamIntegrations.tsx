@@ -73,7 +73,7 @@ export const TeamIntegrations: React.FC = () => {
           <KeyRound size={12} /> API KEYS FOR BOTS & CI
         </p>
         <p className="text-[12px] leading-relaxed text-[#64748B] mb-2">
-          Send as <span className="mono text-[11px] text-[#94A3B8]">X-API-Key</span> header or <span className="mono text-[11px] text-[#94A3B8]">?api_key=</span> to use signals, query, trends and compare programmatically.
+          Send as the <span className="mono text-[11px] text-[#94A3B8]">X-API-Key</span> header to use signals, query, trends and compare programmatically.
         </p>
         <div className="flex gap-2 mb-2">
           <input

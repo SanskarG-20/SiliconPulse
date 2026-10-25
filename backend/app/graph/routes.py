@@ -131,7 +131,10 @@ INSTRUCTIONS:
 - Suggest mitigations (dual-source, inventory, alternative fab)
 - Keep confidence Medium/Low due to simulation uncertainty
 """
-            scenario_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+            from ..services.secure_prompt import validate_insight_report
+
+            raw_report = await gemini_client.generate_content_with_fallback(prompt, response_schema=InsightReport)
+            scenario_report = validate_insight_report(raw_report).model_dump_json()
         except Exception as e:
             import logging
 

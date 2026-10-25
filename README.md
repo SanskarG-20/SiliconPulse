@@ -118,7 +118,7 @@ Apply the SQL in `supabase/migrations/` (via the Supabase SQL Editor) to enable 
 
 ## API Overview
 
-Base URL `http://localhost:8000` (interactive docs at `/docs`). All `/api/*` routes accept a Clerk JWT (`Authorization: Bearer …`); most also accept an API key (`X-API-Key` or `?api_key=`). Public endpoints: `/health`, `/ping`, `/metrics`, shared briefs, and brief comments.
+Base URL `http://localhost:8000` (interactive docs at `/docs`). All `/api/*` routes accept a Clerk JWT (`Authorization: Bearer …`); most also accept an API key in the `X-API-Key` header. API keys in query strings are not accepted. Public endpoints include `/health`, `/ping`, shared briefs, and comments on public briefs. `/metrics` requires authentication.
 
 | Area | Endpoints |
 |------|-----------|
@@ -127,7 +127,7 @@ Base URL `http://localhost:8000` (interactive docs at `/docs`). All `/api/*` rou
 | Ingestion | `POST /api/ingest/pdf`, `POST /api/ingest/sec`, `POST /api/inject`, `GET/POST/DELETE /api/rss` |
 | Collaboration | `POST /api/briefs/share`, `GET /api/briefs/public/:id`, brief comments, `/api/workspaces*` |
 | Personal | `/api/watchlist*`, `/api/history/*`, `/api/digest/*`, `/api/keys`, `/api/webhooks`, `/api/videos` |
-| Realtime | `GET /api/signals`, `WS /api/ws/signals?token=JWT` |
+| Realtime | `GET /api/signals`, authenticated `POST /api/auth/ws-ticket`, `WS /api/ws/signals?ticket=...` |
 
 ## Testing
 

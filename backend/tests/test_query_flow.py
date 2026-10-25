@@ -114,13 +114,10 @@ def test_generate_fallback_when_no_evidence():
 
 
 def test_generate_with_evidence_calls_gemini():
-    fake_insight = '{"sections": [{"id": "evidence", "title": "Live Signal Evidence", "points": ["NVIDIA launched"]}]}'
-    
-    async def fake_stream(*args, **kwargs):
-        yield fake_insight
+    fake_insight = '{"sections": [{"id":"evidence","title":"Evidence","points":["NVIDIA launched"]},{"id":"confidence","title":"Confidence","value":"Medium","reason":"One item"},{"id":"ceo","title":"Summary","text":"NVIDIA launched a product."}]}'
 
-    with patch("app.routes.query.gemini_client.generate_content_stream_with_fallback") as mock_gen:
-        mock_gen.side_effect = fake_stream
+    with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock) as mock_gen:
+        mock_gen.return_value = fake_insight
         # need gemini_api_key set for this path
         with patch("app.routes.query.settings") as mock_settings:
             mock_settings.gemini_api_key = "fake-key"
@@ -129,8 +126,20 @@ def test_generate_with_evidence_calls_gemini():
             context = "[2026-08-20T12:00:00Z | Reuters] NVIDIA launches H100 successor"
             resp = client.post("/api/generate", json={"query": "NVIDIA impact?", "context": context})
             assert resp.status_code == 200
-            assert "sections" in resp.text
-            mock_gen.assert_called_once()
+            assert "sections" in resp.json()["insight"]
+            assert "BEGIN_UNTRUSTED_RETRIEVED_EVIDENCE" in mock_gen.call_args.args[0]
+        mock_gen.assert_called_once()
+
+
+def test_generate_rejects_nonconforming_model_output():
+    with patch("app.routes.query.gemini_client.generate_content_with_fallback", new_callable=AsyncMock) as mock_gen:
+        mock_gen.return_value = '{"sections": [], "extra": "not allowed"}'
+        with patch("app.routes.query.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.gemini_model = "gemini-1.5-flash"
+            resp = client.post("/api/generate", json={"query": "NVIDIA", "context": "[source] hostile text"})
+        assert resp.status_code == 502
+        mock_gen.assert_called_once()
 
 
 def test_inject_then_query():

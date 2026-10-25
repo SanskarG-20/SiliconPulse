@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -41,6 +42,15 @@ def pull_gdelt_signals(max_articles: int = 50) -> int:
 
     # Get last checkpoint
     last_checkpoint = storage.get_checkpoint("GDELT")
+    now = datetime.now(timezone.utc)
+    try:
+        start = datetime.fromisoformat((last_checkpoint or "").replace("Z", "+00:00")) - timedelta(hours=24)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        start = now - timedelta(hours=settings.ingestion_lookback_hours)
+    startdatetime = start.astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
+    enddatetime = now.strftime("%Y%m%d%H%M%S")
 
     try:
         # GDELT 2.0 API: Search for recent articles mentioning our companies
@@ -54,14 +64,23 @@ def pull_gdelt_signals(max_articles: int = 50) -> int:
                 query = f'"{company}" OR "{company.lower()}"'
 
                 # GDELT format: max recent articles about each company
-                url = f"https://api.gdeltproject.org/api/v2/doc/doc?query={query}&mode=json&maxrecords=10&sort=date&sourcelang=eng"
+                url = "https://api.gdeltproject.org/api/v2/doc/doc"
+                params = {
+                    "query": query,
+                    "mode": "json",
+                    "maxrecords": min(max_articles, 250),
+                    "sort": "date",
+                    "sourcelang": "eng",
+                    "startdatetime": startdatetime,
+                    "enddatetime": enddatetime,
+                }
 
                 # Retry logic with exponential backoff (3 attempts, 30s timeout each)
                 max_retries = 3
                 response = None
                 for attempt in range(max_retries):
                     try:
-                        response = requests.get(url, timeout=30)
+                        response = requests.get(url, params=params, timeout=30)
                         response.raise_for_status()
                         break  # Success, exit retry loop
                     except requests.exceptions.HTTPError as e:
@@ -117,10 +136,6 @@ def pull_gdelt_signals(max_articles: int = 50) -> int:
                         else:
                             timestamp = get_current_timestamp()
 
-                        # Checkpoint filtering
-                        if last_checkpoint and timestamp <= last_checkpoint:
-                            continue
-
                         raw_title = article.get("title", "")
                         if not raw_title:
                             continue
@@ -157,7 +172,8 @@ def pull_gdelt_signals(max_articles: int = 50) -> int:
         # Write to stream
         added_count = deduplicate_and_append(events, settings.resolved_data_path)
 
-        # Update checkpoint if we added new events
+        # Advance only after a completed pull; overlap windows plus Postgres
+        # event-ID conflicts make restart/retry ingestion safe.
         if events:
             newest_ts = max(events, key=lambda x: x.get("timestamp", ""))["timestamp"]
             storage.update_checkpoint("GDELT", newest_ts)

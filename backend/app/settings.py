@@ -1,4 +1,3 @@
-import platform
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,6 +7,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     app_name: str = "SiliconPulse API"
+    app_env: str = "development"
     clerk_issuer: str = ""
     clerk_audience: str = ""
     privileged_inject_role: str = "admin"
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-1.5-flash"
     gemini_fallback_models: list[str] = ["gemini-1.5-pro", "gemini-1.0-pro"]
     data_stream_path: str = "data/stream.jsonl"
+    local_cache_enabled: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
 
@@ -27,10 +28,7 @@ class Settings(BaseSettings):
     dedup_enabled: bool = True
     checkpoint_enabled: bool = True
     db_path: str = "data/siliconpulse.db"
-
-    # Pathway Settings - Default False on Windows since Pathway doesn't run natively
-    use_pathway: bool = platform.system() != "Windows"
-    pathway_output_path: str = "data/pathway_out.jsonl"
+    ingestion_lookback_hours: int = 72
 
     # GDELT Settings (free API)
     gdelt_enabled: bool = True
@@ -66,15 +64,6 @@ class Settings(BaseSettings):
         if path.is_absolute():
             return path
         # Resolve relative to backend root
-        base_dir = Path(__file__).resolve().parent.parent
-        return base_dir / path
-
-    @property
-    def resolved_pathway_path(self) -> Path:
-        """Resolve pathway output path to absolute path"""
-        path = Path(self.pathway_output_path)
-        if path.is_absolute():
-            return path
         base_dir = Path(__file__).resolve().parent.parent
         return base_dir / path
 

@@ -92,12 +92,4 @@ def test_metrics_includes_workers():
     assert "vector_signals" in data
 
 
-def test_pathway_sharding():
-    from app.workers.pathway_distributed import _shard_for
-
-    # Same event_id should map to same shard
-    assert _shard_for("abc123", 4) == _shard_for("abc123", 4)
-    # Different shards in range
-    for count in [1, 2, 4, 8]:
-        s = _shard_for("test-id", count)
-        assert 0 <= s < count
+\n

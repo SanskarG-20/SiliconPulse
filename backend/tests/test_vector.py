@@ -21,13 +21,25 @@ def _clear_query_cache():
     query_cache.clear()
 
 
-def test_vector_store_available():
+def _use_temp_chroma(tmp_path, monkeypatch):
+    from app.settings import settings
+    from app.services import vector_store
+
+    monkeypatch.setattr(vector_store, "is_supabase_enabled", lambda: False)
+    monkeypatch.setattr(settings, "db_path", str(tmp_path / "dev.sqlite"))
+    monkeypatch.setattr(vector_store, "_collection", None)
+    monkeypatch.setattr(vector_store, "_available", None)
+
+
+def test_vector_store_available(tmp_path, monkeypatch):
+    _use_temp_chroma(tmp_path, monkeypatch)
     from app.services.vector_store import count, is_available
     assert is_available() is True
     assert count() >= 0
 
 
-def test_upsert_and_query_similar():
+def test_upsert_and_query_similar(tmp_path, monkeypatch):
+    _use_temp_chroma(tmp_path, monkeypatch)
     from app.services.vector_store import count, query_similar, upsert_signals
 
     events = [

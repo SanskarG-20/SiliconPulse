@@ -201,12 +201,13 @@ async def _run_due_digests() -> dict:
     for pref in due:
         try:
             res = await deliver_to_user(pref.get("email"), pref.get("webhook_url"), digest)
-            if res.get("email") or res.get("slack"):
+            delivered = bool(res.get("email") or res.get("slack"))
+            if delivered:
                 sent += 1
-            try:
-                mark_digest_sent(pref.get("user_id", ""))
-            except Exception:
-                pass
+                try:
+                    mark_digest_sent(pref.get("user_id", ""))
+                except Exception:
+                    logger.warning("Digest delivery marker update failed for %s", pref.get("user_id"))
         except Exception as e:
             logger.warning(f"digest delivery failed for {pref.get('user_id')}: {e}")
     logger.info(f"Digest cron hour {hour}: {sent}/{len(due)} delivered")

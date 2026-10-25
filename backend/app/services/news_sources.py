@@ -4,10 +4,11 @@ import asyncio
 import hashlib
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from .. import storage
 from ..settings import settings
 from ..utils import (
     classify_event_type,
@@ -78,11 +79,13 @@ def _normalize(article: dict) -> dict:
 # Individual API fetchers
 # ---------------------------------------------------------------------------
 
-async def fetch_newsapi(query: str) -> list[dict]:
+async def fetch_newsapi(query: str, since: str | None = None) -> list[dict]:
     if not NEWSAPI_API_KEY:
         return []
     url = "https://newsapi.org/v2/everything"
-    params = {"apiKey": NEWSAPI_API_KEY, "q": query, "language": "en", "pageSize": 10, "sortBy": "publishedAt"}
+    params = {"apiKey": NEWSAPI_API_KEY, "q": query, "language": "en", "pageSize": 100, "sortBy": "publishedAt"}
+    if since:
+        params["from"] = since
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             resp = await client.get(url, params=params)
@@ -108,9 +111,9 @@ async def fetch_newsapi(query: str) -> list[dict]:
 # Aggregator
 # ---------------------------------------------------------------------------
 
-async def fetch_all_sources(query: str) -> list[dict]:
+async def fetch_all_sources(query: str, since: str | None = None) -> list[dict]:
     results = await asyncio.gather(
-        fetch_newsapi(query),
+        fetch_newsapi(query, since=since),
         return_exceptions=True,
     )
 
@@ -145,9 +148,18 @@ async def ingest_news_stream() -> dict[str, int]:
         if (now - cached_at).total_seconds() < CACHE_TTL_SECONDS:
             return {"total_fetched": len(cached_data), "new_added": 0, "cached": True}
 
+    last_checkpoint = storage.get_checkpoint("NewsAPI")
+    try:
+        catchup_start = datetime.fromisoformat((last_checkpoint or "").replace("Z", "+00:00")) - timedelta(hours=24)
+        if catchup_start.tzinfo is None:
+            catchup_start = catchup_start.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        catchup_start = datetime.now(timezone.utc) - timedelta(hours=settings.ingestion_lookback_hours)
+    since = catchup_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
     all_articles: list[dict] = []
     for query in SIGNAL_QUERIES:
-        batch = await fetch_all_sources(query)
+        batch = await fetch_all_sources(query, since=since)
         all_articles.extend(batch)
 
     seen: set[str] = set()
@@ -161,9 +173,13 @@ async def ingest_news_stream() -> dict[str, int]:
             unique.append(article)
 
     unique.sort(key=lambda a: str(a.get("timestamp") or ""), reverse=True)
-    top = unique[:50]
+    top = unique[:500]
 
     added = deduplicate_and_append(top, settings.resolved_data_path)
+
+    timestamps = [str(article.get("timestamp") or "") for article in top if article.get("timestamp")]
+    if timestamps:
+        storage.update_checkpoint("NewsAPI", max(timestamps))
 
     _cache[cache_key] = (top, now)
 

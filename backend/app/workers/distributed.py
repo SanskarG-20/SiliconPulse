@@ -65,7 +65,7 @@ def _process_batch(events: list[dict]) -> int:
     if not events:
         return 0
 
-    # Tag phase (company/event_type) - same as pathway pipeline
+    # Tag phase (company/event_type) before the event is persisted.
     try:
         from app.utils import deduplicate_and_append
 

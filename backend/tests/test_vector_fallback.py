@@ -43,6 +43,7 @@ def test_vector_facade_falls_back_to_chroma_on_pg_error():
 
     with patch("app.services.vector_store._pg_available", return_value=True), \
          patch("app.services.vector_store._pg") as mock_pg, \
+         patch("app.services.vector_store.is_supabase_enabled", return_value=False), \
          patch("app.services.vector_store._get_collection", return_value=mock_coll):
         mock_pg.upsert_signals.side_effect = Exception("pg down")
         n = vs.upsert_signals(fake_events, fake_embs)
@@ -55,6 +56,7 @@ def test_vector_count_fallback():
     from app.services import vector_store as vs
 
     with patch("app.services.vector_store._pg_available", return_value=False), \
+         patch("app.services.vector_store.is_supabase_enabled", return_value=False), \
          patch("app.services.vector_store._get_collection", return_value=None):
         assert vs.count() == 0
         assert vs.is_available() is False

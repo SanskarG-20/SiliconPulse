@@ -1,8 +1,4 @@
-"""
-Vector store facade for SiliconPulse signals.
-Tries Supabase pgvector first (persistent, shared), falls back to Chroma (local file).
-Graceful no-op when both unavailable.
-"""
+"""Vector store facade: pgvector is authoritative when configured; Chroma is dev-only."""
 from __future__ import annotations
 
 import logging
@@ -10,6 +6,7 @@ import threading
 from pathlib import Path
 
 from app.settings import settings
+from app.supabase_client import is_supabase_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +97,10 @@ def _pg_available() -> bool:
 def is_available() -> bool:
     if _pg_available():
         return True
+    if is_supabase_enabled():
+        # In hosted deployments pgvector is authoritative; never mask its
+        # failure by silently reading a stale, process-local Chroma collection.
+        return False
     return _get_collection() is not None
 
 
@@ -115,6 +116,8 @@ def upsert_signals(events: list[dict], embeddings: list[list[float]]) -> int:
                 return n
         except Exception as e:
             logger.debug(f"pgvector upsert failed, falling back to Chroma: {e}")
+    if is_supabase_enabled():
+        return 0
     coll = _get_collection()
     if coll is None:
         return 0
@@ -177,6 +180,8 @@ def query_similar(query_embedding: list[float], k: int = 10) -> list[dict]:
                 return res
         except Exception as e:
             logger.debug(f"pgvector query failed, falling back: {e}")
+    if is_supabase_enabled():
+        return []
     coll = _get_collection()
     if coll is None:
         return []
@@ -226,6 +231,8 @@ def count() -> int:
                 return n
         except Exception:
             pass
+    if is_supabase_enabled():
+        return -1
     coll = _get_collection()
     if coll is None:
         return 0

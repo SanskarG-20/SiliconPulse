@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from .core.auth import get_current_user
 from .core.limiter import limiter
 from .routes import router
-from .scheduler import start_scheduler, stop_scheduler
+from .supabase_client import is_supabase_enabled
 from .settings import settings
 from .storage import get_db_connection, init_db
 from .utils import now_ts
@@ -33,29 +33,19 @@ ERROR_COUNT = 0
 async def lifespan(app: FastAPI):
     # startup
     logger.info("Starting up SiliconPulse API...")
-    logger.info(f"Using DATA_STREAM_PATH={settings.resolved_data_path}")
-    init_db()
-    logger.info("Database initialized")
-    # Distributed workers (for 1M+ events/day) — no-op when disabled
-    try:
-        from app.workers.distributed import start_distributed_workers
+    if is_supabase_enabled():
+        from .services.signal_store import check_ready
 
-        start_distributed_workers()
-    except Exception as e:
-        logger.debug(f"Distributed workers not started: {e}")
-    start_scheduler()
-    logger.info("Real-time data scheduler started")
+        check_ready()
+        logger.info("Supabase/Postgres canonical storage verified")
+    else:
+        if settings.app_env.lower() == "production":
+            raise RuntimeError("APP_ENV=production requires Supabase/Postgres configuration")
+        init_db()
+        logger.info("Initialized local-development storage at %s", settings.db_path)
     yield
     # shutdown
     logger.info("Shutting down SiliconPulse API...")
-    stop_scheduler()
-    logger.info("Scheduler stopped")
-    try:
-        from app.workers.distributed import stop_distributed_workers
-
-        stop_distributed_workers()
-    except Exception:
-        pass
 
 
 app = FastAPI(
@@ -140,22 +130,19 @@ async def root():
 async def health():
     # Detailed health checks
     checks = {}
-    # DB check
+    # Canonical store check, or local-development SQLite check.
     try:
-        conn = get_db_connection()
-        conn.execute("SELECT 1")
+        if is_supabase_enabled():
+            from .services.signal_store import check_ready
+
+            check_ready()
+        else:
+            conn = get_db_connection()
+            conn.execute("SELECT 1")
         checks["database"] = "ok"
     except Exception as e:
         checks["database"] = f"error: {e}"
-    # Stream file check
-    try:
-        stream_path = settings.resolved_data_path
-        if stream_path.exists():
-            checks["stream_file"] = f"ok ({stream_path.stat().st_size} bytes)"
-        else:
-            checks["stream_file"] = "missing (will be created on first write)"
-    except Exception as e:
-        checks["stream_file"] = f"error: {e}"
+    checks["signal_store"] = "Supabase/Postgres" if is_supabase_enabled() else "local-development JSONL cache"
     # Gemini check
     checks["gemini_configured"] = bool(settings.gemini_api_key)
     # Vector store check
@@ -188,13 +175,13 @@ async def metrics():
     uptime = int(time.time() - START_TIME)
     # Stream stats
     stream_path = settings.resolved_data_path
-    stream_size = stream_path.stat().st_size if stream_path.exists() else 0
+    from .services.signal_store import is_enabled as canonical_store_enabled
+    stream_size = stream_path.stat().st_size if (not canonical_store_enabled() or settings.local_cache_enabled) and stream_path.exists() else 0
     # DB stats
     try:
-        conn = get_db_connection()
-        cur = conn.execute("SELECT COUNT(*) FROM seen_events")
-        row = cur.fetchone()
-        seen_count = row[0] if row else 0
+        from .storage import seen_count as get_seen_count
+
+        seen_count = get_seen_count()
     except Exception:
         seen_count = -1
     # Vector stats

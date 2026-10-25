@@ -361,18 +361,28 @@ def upsert_digest_prefs(
 
 
 def list_due_digest_prefs(hour_utc: int) -> list[dict]:
-    """Prefs with enabled=true for this UTC hour whose last_sent_at is not today."""
+    """Return elapsed digests and previous-day misses for catch-up after downtime."""
     client = get_supabase_client()
     if client is None:
         return []
     try:
-        resp = client.table("digest_prefs").select("*").eq("enabled", True).eq("hour_utc", hour_utc).execute()
+        resp = client.table("digest_prefs").select("*").eq("enabled", True).execute()
         rows = resp.data or []
         today = __import__("datetime").datetime.utcnow().date().isoformat()
         due = []
         for r in rows:
             last = (r.get("last_sent_at") or "")[:10]
-            if last != today and (r.get("email") or r.get("webhook_url")):
+            try:
+                scheduled_hour = int(r.get("hour_utc", 0))
+            except (TypeError, ValueError):
+                continue
+            created = (r.get("created_at") or today)[:10]
+            missed_prior_day = (last and last < today) or (not last and created < today)
+            if (
+                last != today
+                and (missed_prior_day or scheduled_hour <= hour_utc)
+                and (r.get("email") or r.get("webhook_url"))
+            ):
                 due.append(r)
         return due
     except Exception as exc:
@@ -385,7 +395,9 @@ def mark_digest_sent(user_id: str) -> None:
     if client is None or not user_id:
         return
     try:
-        client.table("digest_prefs").update({"last_sent_at": __import__("datetime").datetime.utcnow().isoformat() + "Z"}).eq("user_id", user_id).execute()
+        from datetime import datetime, timezone
+
+        client.table("digest_prefs").update({"last_sent_at": datetime.now(timezone.utc).isoformat()}).eq("user_id", user_id).execute()
     except Exception as exc:
         logger.debug(f"mark_digest_sent failed for {user_id}: {exc}")
 

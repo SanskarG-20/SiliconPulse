@@ -505,7 +505,8 @@ def compute_recency_boost(timestamp: str, max_boost: int = 50) -> int:
 
 def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
     """
-    Append new events to the file only if they don't already exist in SQLite store.
+    Persist new events to Supabase/Postgres when configured, otherwise use the
+    SQLite + JSONL local-development fallback.
     Returns the number of new events added.
     Also enqueues embeddings for the vector store (best-effort, async).
     """
@@ -514,6 +515,11 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
 
     added_count = 0
     events_to_write = []
+    from .settings import settings
+
+    from app.services.signal_store import insert_events, is_enabled as canonical_store_enabled
+
+    canonical_store = canonical_store_enabled()
 
     for event in new_events:
         # Sanitize before dedup so IDs are based on clean text (fixes legacy &#x2F; duplicates)
@@ -530,16 +536,21 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
                     event["url"] = cleaned
         except Exception:
             pass
-        event_id = compute_event_id(event)
+        if not canonical_store:
+            event_id = compute_event_id(event)
+            if not storage.is_duplicate(event_id):
+                storage.mark_seen(event_id, event.get('source', 'unknown'), event.get('title', ''))
+                events_to_write.append(event)
 
-        # Check if seen in DB
-        if not storage.is_duplicate(event_id):
-            # Mark as seen
-            storage.mark_seen(event_id, event.get('source', 'unknown'), event.get('title', ''))
-            events_to_write.append(event)
-            added_count += 1
+    if canonical_store:
+        # The Postgres RPC performs a single conflict-safe insert per batch.
+        events_to_write = insert_events(new_events)
+    added_count = len(events_to_write)
 
-    if events_to_write:
+    cache_enabled = not canonical_store or (
+        settings.local_cache_enabled and settings.app_env.lower() != "production"
+    )
+    if events_to_write and cache_enabled:
         # Ensure parent dir exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -548,6 +559,7 @@ def deduplicate_and_append(new_events: list[dict], file_path: Path) -> int:
                 json.dump(event, f, ensure_ascii=False)
                 f.write("\n")
 
+    if events_to_write:
         # Best-effort async embedding + vector upsert
         try:
             import asyncio
@@ -606,20 +618,42 @@ def safe_read_jsonl(path: Path, limit: int = 200, freshness_hours: int | None = 
     """
     events = []
     try:
+        from app.services.signal_store import is_enabled as canonical_store_enabled, list_events
+
+        if canonical_store_enabled():
+            read_limit = limit * 5 if freshness_hours else limit
+            for event in list_events(read_limit):
+                if not isinstance(event, dict):
+                    continue
+                title = str(event.get("title") or "").strip()
+                if not title:
+                    continue
+                event.setdefault("timestamp", get_current_timestamp())
+                event.setdefault("source", "Unknown")
+                event.setdefault("snippet", str(event.get("content") or title)[:300])
+                event.setdefault("content", event.get("snippet") or title)
+                try:
+                    event["title"] = sanitize_title(str(event.get("title") or ""))
+                    event["content"] = sanitize_content(str(event.get("content") or ""), max_len=2000)
+                    event["snippet"] = sanitize_content(str(event.get("snippet") or ""), max_len=600)
+                    if event.get("url"):
+                        event["url"] = clean_url(str(event["url"])) or event["url"]
+                    event["source"] = sanitize_title(str(event.get("source") or "Unknown"))
+                except Exception:
+                    pass
+                if freshness_hours is not None and not is_fresh(event.get("timestamp", ""), freshness_hours):
+                    continue
+                events.append(event)
+                if len(events) >= limit:
+                    break
+            return events
+
         if not path.exists():
             return []
 
         # If filtering by freshness, we might need to read more lines to find enough fresh ones
         # So we read more if freshness filter is active
         read_limit = limit * 5 if freshness_hours else limit
-
-        # PATHWAY INTEGRATION: Check if we should read from pathway output instead
-        from app.settings import settings
-        if settings.use_pathway:
-            pathway_path = settings.resolved_pathway_path
-            if pathway_path.exists() and pathway_path.stat().st_size > 0:
-                path = pathway_path
-                # logger.info(f"Reading from Pathway output: {path}")
 
         with open(path, encoding="utf-8", errors="ignore") as f:
             all_lines = f.readlines()

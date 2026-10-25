@@ -2,7 +2,6 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..cache import event_cache
 from ..core.auth import get_current_user
 from ..demo_generator import DemoGenerator
 from ..settings import settings
@@ -56,8 +55,6 @@ async def bootstrap_system():
 
         data_path = settings.resolved_data_path
         added_count = deduplicate_and_append(new_events, data_path)
-
-        event_cache.refresh(data_path)
 
         return {
             "status": "success",

@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -40,6 +41,13 @@ def pull_hn_signals(max_stories: int = 100) -> int:
 
     # Get last checkpoint
     last_checkpoint = storage.get_checkpoint("HackerNews")
+    try:
+        start = datetime.fromisoformat((last_checkpoint or "").replace("Z", "+00:00")) - timedelta(minutes=5)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        start = datetime.now(timezone.utc) - timedelta(hours=settings.ingestion_lookback_hours)
+    numeric_filter = f"created_at_i>{int(start.timestamp())}"
 
     try:
         # Use Algolia HN API - faster and better filtering than official API
@@ -49,14 +57,21 @@ def pull_hn_signals(max_stories: int = 100) -> int:
         for keyword in keywords:
             try:
                 # Algolia HN API search endpoint
-                url = f"https://hn.algolia.com/api/v1/search?query={keyword}&tags=story&hitsPerPage=20&typoTolerance=false"
+                url = "https://hn.algolia.com/api/v1/search"
+                params = {
+                    "query": keyword,
+                    "tags": "story",
+                    "hitsPerPage": min(max_stories, 100),
+                    "typoTolerance": "false",
+                    "numericFilters": numeric_filter,
+                }
 
                 # Retry logic with exponential backoff (2 attempts, 15s timeout)
                 max_retries = 2
                 response = None
                 for attempt in range(max_retries):
                     try:
-                        response = requests.get(url, timeout=15)
+                        response = requests.get(url, params=params, timeout=15)
                         response.raise_for_status()
                         break  # Success, exit retry loop
                     except requests.Timeout:
@@ -90,10 +105,6 @@ def pull_hn_signals(max_stories: int = 100) -> int:
 
                         if not created_at:
                             created_at = get_current_timestamp()
-
-                        # Checkpoint filtering
-                        if last_checkpoint and created_at <= last_checkpoint:
-                            continue
 
                         raw_title = story.get("title", "")
                         if not raw_title:

@@ -37,6 +37,7 @@ def test_ws_ticket_is_hashed_short_lived_and_single_use(monkeypatch):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     monkeypatch.setattr("app.storage.get_db_connection", lambda: conn)
+    monkeypatch.setattr("app.supabase_client.is_supabase_enabled", lambda: False)
     ticket = create_websocket_ticket("tenant-a", ttl_seconds=60)
     row = conn.execute("SELECT ticket_hash FROM websocket_tickets").fetchone()
     assert row["ticket_hash"] == hashlib.sha256(ticket.encode()).hexdigest()
@@ -58,6 +59,7 @@ def test_expired_ws_ticket_fails_closed(monkeypatch):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     monkeypatch.setattr("app.storage.get_db_connection", lambda: conn)
+    monkeypatch.setattr("app.supabase_client.is_supabase_enabled", lambda: False)
     ticket = create_websocket_ticket("tenant-a")
     conn.execute("UPDATE websocket_tickets SET expires_at = 0")
     conn.commit()

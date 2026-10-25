@@ -9,6 +9,7 @@ services:
     env_file:
       - .env
     environment:
+      - APP_ENV=development
       - HOST=0.0.0.0
       - PORT=8000
       - DATA_STREAM_PATH=data/stream.jsonl
@@ -38,17 +39,23 @@ services:
       timeout: 3s
       retries: 3
 
-  pathway:
+  scheduler:
     build: ./backend
-    container_name: siliconpulse-pathway
-    command: python pathway_pipeline.py
+    container_name: siliconpulse-scheduler
+    command: python -m app.scheduler_worker
     env_file:
       - .env
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379/0
+      - DATA_STREAM_PATH=data/stream.jsonl
+      - DB_PATH=data/siliconpulse.db
     volumes:
       - ./backend/data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
-    deploy:
-      replicas: 1
 
   worker:
     build: ./backend
